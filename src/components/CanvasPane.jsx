@@ -98,10 +98,14 @@ const defaultEdgeOptions = {
  *   requirementDoc: string,
  *   isUpdatingDoc: boolean,
  *   onUpdateRequirement: () => void,
+ *   consistencyResult: { issues: Array, summary: { errors: number, warnings: number } },
+ *   reviewReport: string,
+ *   isGeneratingReview: boolean,
+ *   onGenerateReview: () => void,
  * }} props
  */
-function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, onNodeDragStop, onShowExport, requirementDoc, isUpdatingDoc, onUpdateRequirement }) {
-  const [rightPanel, setRightPanel] = useState('none'); // 'none', 'wireframe', 'requirement'
+function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, onNodeDragStop, onShowExport, requirementDoc, isUpdatingDoc, onUpdateRequirement, consistencyResult, reviewReport, isGeneratingReview, onGenerateReview }) {
+  const [rightPanel, setRightPanel] = useState('none'); // 'none', 'wireframe', 'requirement', 'review'
 
   // レイアウト計算（SRP: useAutoLayoutに委譲）
   const { layoutedNodes, updatePosition } = useAutoLayout(nodes, edges);
@@ -171,6 +175,25 @@ function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, o
           </svg>
           要件定義
         </button>
+        {(() => {
+          const totalIssues = (consistencyResult?.summary?.errors ?? 0) + (consistencyResult?.summary?.warnings ?? 0);
+          return (
+            <button
+              onClick={() => setRightPanel(p => p === 'review' ? 'none' : 'review')}
+              className={`relative flex items-center gap-2 px-4 py-2 border text-sm font-medium rounded-lg shadow-sm transition-colors ${rightPanel === 'review' ? 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              レビュー
+              {totalIssues > 0 && rightPanel !== 'review' && (
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {totalIssues}
+                </span>
+              )}
+            </button>
+          );
+        })()}
         <button
           onClick={onShowExport}
           className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
@@ -244,6 +267,18 @@ function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, o
               >
                 ワイヤー
               </button>
+              <button
+                onClick={() => setRightPanel('review')}
+                className={`relative px-3 py-1 text-xs font-bold rounded-md transition-all ${rightPanel === 'review' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                レビュー
+                {(() => {
+                  const total = (consistencyResult?.summary?.errors ?? 0) + (consistencyResult?.summary?.warnings ?? 0);
+                  return total > 0 && rightPanel !== 'review' ? (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{total}</span>
+                  ) : null;
+                })()}
+              </button>
             </div>
             <button
               onClick={() => setRightPanel('none')}
@@ -256,6 +291,98 @@ function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, o
           <div className="flex-1 flex flex-col overflow-hidden">
             {rightPanel === 'wireframe' ? (
               <iframe className="flex-1 w-full border-none" srcDoc={wireframeHtml} title="wireframe" sandbox="allow-same-origin" />
+            ) : rightPanel === 'review' ? (
+              <>
+                {/* レビューパネルヘッダー */}
+                <div className="px-4 py-2.5 flex items-center justify-between border-b border-gray-100 flex-shrink-0">
+                  <h3 className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    整合性レビュー
+                  </h3>
+                </div>
+
+                <div className="flex-1 overflow-y-auto flex flex-col">
+                  {/* ルールベース自動チェック結果 */}
+                  <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">自動チェック結果</p>
+                    {!consistencyResult || consistencyResult.issues.length === 0 ? (
+                      <div className="flex items-center gap-1.5 text-xs text-green-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        問題は検出されませんでした
+                      </div>
+                    ) : (
+                      <ul className="flex flex-col gap-1.5">
+                        {consistencyResult.issues.map(issue => (
+                          <li key={issue.id} className={`flex items-start gap-1.5 text-xs rounded px-2 py-1.5 ${issue.severity === 'error' ? 'bg-red-50 text-red-700' : 'bg-yellow-50 text-yellow-800'}`}>
+                            <span className="flex-shrink-0 mt-0.5">{issue.severity === 'error' ? '✗' : '⚠'}</span>
+                            <span>{issue.message}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* AI深掘りレビュー */}
+                  <div className="px-4 py-3 border-b border-gray-100 flex-shrink-0">
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">AIによる詳細レビュー</p>
+                    <button
+                      onClick={onGenerateReview}
+                      disabled={isGeneratingReview}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-amber-600 text-white text-xs font-bold rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
+                    >
+                      {isGeneratingReview ? (
+                        <>
+                          <svg className="animate-spin w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                          </svg>
+                          分析中...
+                        </>
+                      ) : (
+                        <>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                          </svg>
+                          AIに詳細レビューを依頼
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* AIレビューレポート表示 */}
+                  <div className="flex-1 relative overflow-hidden" style={{ minHeight: '200px' }}>
+                    {!reviewReport && !isGeneratingReview ? (
+                      <div className="p-4 text-xs text-gray-400 text-center">
+                        ボタンを押すとAIが矛盾・不足を詳細分析します
+                      </div>
+                    ) : (
+                      <>
+                        {isGeneratingReview && (
+                          <div className="absolute inset-0 z-10 bg-white/70 flex items-center justify-center">
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                              </svg>
+                              分析中...
+                            </div>
+                          </div>
+                        )}
+                        {reviewReport && (
+                          <iframe
+                            className="absolute inset-0 w-full h-full border-none"
+                            srcDoc={markdownToHtmlDoc(reviewReport)}
+                            title="review-report"
+                            sandbox="allow-same-origin"
+                          />
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </>
             ) : (
               <>
                 {/* ヘッダー */}

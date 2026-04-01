@@ -1,85 +1,47 @@
 /**
  * requirementDocService
  *
- * 責務: 会話履歴から詳細要件定義書（Markdown）を生成する
+ * 責務: SystemContextから詳細要件定義書（Markdown）を生成する
  *
  * ARC原則:
  * - 副作用（Gemini API通信）を閉じ込め、Result型で返却
  * - geminiService と同じ retry + timeout パターンを踏襲
  * - APIキー未設定時はモック（会話履歴の構造化変換）にフォールバック
  *
- * Input:  messages: Array<{role, content}>
+ * フェーズ1改修:
+ * - 引数を messages のみ → SystemContext に変更
+ * - buildContents が nodes/edges のグラフ情報をプロンプトに含めるよう拡張
+ *   → 設計図で手動修正したノード情報が要件定義書に反映される
+ *
+ * フェーズ3改修:
+ * - SYSTEM_PROMPT 定数を削除し、getPrompt('requirementDoc', { graphSnapshot }) 経由で取得
+ *
+ * Input:  SystemContext
  * Output: Result<string>  (Markdown形式の要件定義書)
  */
 import { ok, fail } from '../types/result.js';
+import { MODELS, THINKING } from './geminiConfig.js';
+import { callGenerateContent } from './geminiClient.js';
+import { getPrompt } from '../prompts/index.js';
+import { serializeDomainForPrompt } from '../types/systemContext.js';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const MODEL = 'gemini-2.0-flash';
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 const MAX_RETRIES = 2;
 const INITIAL_RETRY_DELAY_MS = 1000;
 const REQUEST_TIMEOUT_MS = 45000; // 長文生成のため少し長め
 
-const SYSTEM_PROMPT = `あなたは熟練のシステムアナリスト兼ITコンサルタントです。
-ユーザーとAIアシスタントの会話履歴を分析し、以下のMarkdown構造で「詳細要件定義書」を生成してください。
-
-このドキュメントは「開発の礎」であると同時に「ブレストの道具」です。
-単に決まったことを書くだけでなく、エンジニアの視点で「ここが曖昧だ」「この仕様だと矛盾が生じる」といった懸念点を積極的に盛り込んでください。
-
----
-
-# アプリ要件定義書
-
-## 1. プロジェクト概要
-- **アプリ名（仮称）**: 会話から推測されるアプリ名
-- **目的・解決する課題**: 誰の、どんな負を解消するか
-- **ターゲットユーザー**: ユーザー像とその利用シーン
-
-## 2. 機能要件
-### 2.1 必須機能（Must Have）
-- 会話中で明確に定義されたコア機能
-### 2.2 推奨機能（Should Have）
-- ユーザー体験を向上させるために検討すべき機能
-### 2.3 将来検討（Nice to Have）
-- スコープ外だが将来的に拡張可能な要素
-
-## 3. 画面構成
-- 画面一覧（画面名: 役割・主要な入力項目/ボタン）
-- ユーザー体験（UX）の勘所（「迷わせない工夫」など）
-
-## 4. データ・ロジック要件
-- 主要なデータ項目と関連性
-- 複雑な計算・判定ロジックがあればその整理
-
-## 5. 非機能要件（エンジニア視点での提言）
-- パフォーマンス、セキュリティ、スケーラビリティへの配慮
-- 会話にない場合でも「一般的モバイルアプリなら〜が必要」といった視点で記載
-
-## 6. ビジネスルール・制約
-- 運用フローや権限管理に関するルール
-
-## 7. 【重要】未決事項・深掘りすべき点（ブレスト項目）
-- **論理的矛盾**: Aと言いながらBと言っている箇所など
-- **情報不足**: 実装するために追加で決める必要があること
-- **AIからの提案**: 「こうすればもっと良くなる」という壁打ち案
-
----
-
-【出力ルール】
-- 純粋なMarkdownテキストのみを出力すること。
-- 日本語で出力すること。
-- 「未定義」で終わらせず、「一般的は〜ですが、どちらにしますか？」といった提案を添えること。`;
-
 // ---------- public ----------
 
 /**
- * 会話履歴から要件定義書を生成する
+ * SystemContextから要件定義書を生成する
  *
- * @param {Array<{role: string, content: string}>} messages
+ * @param {import('../types/systemContext.js').SystemContext} systemContext
  * @returns {Promise<import('../types/result.js').Result<string>>}
  */
-export async function generateRequirementDoc(messages) {
+export async function generateRequirementDoc(systemContext) {
+  const { messages } = systemContext;
+
   if (!messages || messages.length <= 1) {
     return ok(buildEmptyDoc());
   }
@@ -88,7 +50,7 @@ export async function generateRequirementDoc(messages) {
     return ok(buildMockDoc(messages));
   }
 
-  const contents = buildContents(messages);
+  const contents = buildContents(systemContext);
 
   let retries = MAX_RETRIES;
   let delay = INITIAL_RETRY_DELAY_MS;
@@ -96,7 +58,7 @@ export async function generateRequirementDoc(messages) {
 
   while (retries > 0) {
     try {
-      const result = await callWithTimeout(contents);
+      const result = await callApi(contents, systemContext);
       return ok(result);
     } catch (e) {
       lastError = e;
@@ -115,40 +77,25 @@ export async function generateRequirementDoc(messages) {
 
 // ---------- private ----------
 
-async function callWithTimeout(contents) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+async function callApi(contents, systemContext) {
+  // フェーズ3: PromptRegistry + グラフスナップショットを注入してプロンプトを組み立てる
+  const graphSnapshot = serializeDomainForPrompt(systemContext);
+  const systemPrompt = getPrompt('requirementDoc', { graphSnapshot });
 
-  try {
-    const response = await fetch(`${API_URL}?key=${API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        contents,
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        generationConfig: {
-          temperature: 0.3,  // 要件定義は正確性重視
-          maxOutputTokens: 4096
-        }
-      })
-    });
+  const { text } = await callGenerateContent({
+    modelId: MODELS.doc,
+    thinkingLevel: THINKING.doc,
+    contents,
+    systemPrompt,
+    generationConfig: { maxOutputTokens: 4096 },
+    timeoutMs: REQUEST_TIMEOUT_MS,
+  });
 
-    if (!response.ok) {
-      throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status });
-    }
-
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-
-    if (!text.trim()) {
-      throw new Error('Empty response from API');
-    }
-
-    return cleanMarkdown(text);
-  } finally {
-    clearTimeout(timer);
+  if (!text.trim()) {
+    throw new Error('Empty response from API');
   }
+
+  return cleanMarkdown(text);
 }
 
 /**
@@ -161,7 +108,15 @@ function cleanMarkdown(text) {
     .trim();
 }
 
-function buildContents(messages) {
+/**
+ * フェーズ1改修: SystemContext 全体を使ってプロンプト用コンテンツを組み立てる
+ * - 会話履歴に加え、グラフのノード/エッジ情報も含める
+ *
+ * @param {import('../types/systemContext.js').SystemContext} systemContext
+ */
+function buildContents(systemContext) {
+  const { messages } = systemContext;
+
   // 会話履歴を1つのテキストにまとめて送る
   const conversationText = messages
     .map(m => `[${m.role === 'user' ? 'ユーザー' : 'アシスタント'}]: ${m.content}`)
