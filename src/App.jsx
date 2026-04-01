@@ -1,30 +1,36 @@
 /**
  * App
  *
- * 責務: アプリケーションのルートコンポーネント・Orchestrator
+ * 責務: アプリケーションのルートコンポーネント・薄いUI Shell
  *
- * ARC原則（OC による制御）:
+ * フェーズ1+2改修後のARC原則:
  * - useCanvasStore  → nodes/edges の SSOT
  * - useChatSession  → 会話履歴 + API呼び出し
+ * - useAgentOrchestrator → LLM副作用の集約（要件定義書更新・レビュー生成）
+ *                           useEffect によるLLM処理は useAgentOrchestrator に移譲済み
  * - 保存（副作用）  → messages変化時に store.persist() を呼ぶuseEffectに集約
- *                     ChatPane から保存ロジックを完全排除
- * - リセット        → store.reset() + clearSavedProject() のみ（window.reloadなし）
+ *                     このuseEffectのみが App.jsx に残る（LLM処理は含まない）
+ * - リセット        → store.reset() + clearSavedProject() + agent.reset()
  *
- * 依存関係（依存関係の可視化）:
+ * 依存関係:
  * - useCanvasStore  ← useProjectStorage（localStorage）
  * - useChatSession  ← geminiService（Gemini API）
+ * - useAgentOrchestrator ← requirementDocService, reviewService（Gemini API）
+ *                          ← buildSystemContext（SSOT統合）
  * - CanvasPane      ← useAutoLayout, useWireframe（純粋計算）
  */
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
+import { useState } from 'react';
 import { useCanvasStore } from './hooks/useCanvasStore.js';
 import { useChatSession, INITIAL_MESSAGE } from './hooks/useChatSession.js';
 import { loadSavedProject, clearSavedProject } from './hooks/useProjectStorage.js';
+import { useAgentOrchestrator } from './hooks/useAgentOrchestrator.js';
 import { toFlowNode, toFlowEdge } from './utils/layoutUtils.js';
 import ChatPane from './components/ChatPane.jsx';
 import CanvasPane from './components/CanvasPane.jsx';
 import ExportModal from './components/ExportModal.jsx';
-import { generateRequirementDoc } from './services/requirementDocService.js';
 import { usePaneResize } from './hooks/usePaneResize.js';
+import { useConsistencyCheck } from './hooks/useConsistencyCheck.js';
 
 function loadInitialState() {
   const saved = loadSavedProject();
@@ -50,48 +56,32 @@ export default function App() {
   // 会話セッション: ノード/エッジ更新はstoreに委譲
   const chat = useChatSession(store.mergeNodesEdges, initial.messages);
 
-  // 要件定義ドキュメントの状態 (ライブプレビュー & エクスポート用)
-  const [requirementDoc, setRequirementDoc] = useState('');
-  const [isUpdatingDoc, setIsUpdatingDoc] = useState(false);
+  // ルールベース自動整合性チェック（毎ターン自動実行・同期処理）
+  const consistencyResult = useConsistencyCheck(store.nodes, store.edges);
 
-  // 要件定義の更新関数
-  // chat.messages は引数で受け取る設計にして、useCallback依存から外す（循環参照を回避）
-  const handleUpdateRequirement = useCallback(async (msgs) => {
-    if (isUpdatingDoc) return;
-    setIsUpdatingDoc(true);
-    const result = await generateRequirementDoc(msgs);
-    if (result.ok) {
-      setRequirementDoc(result.value);
-    }
-    setIsUpdatingDoc(false);
-  }, [isUpdatingDoc]);
+  // フェーズ2: LLM副作用の集約（要件定義書更新・レビュー生成）
+  // App.jsx から useEffect ベースのLLM処理を完全排除し、ここに委譲
+  const agent = useAgentOrchestrator(
+    chat.messages,
+    chat.isLoading,
+    store.nodes,
+    store.edges
+  );
 
-  // 副作用の集約: messages または nodes/edges が変化したらlocalStorageに保存
+  // 永続化のみの副作用（LLM処理は含まない・useAgentOrchestratorに移譲済み）
   useEffect(() => {
     if (chat.messages.length > 1) {
       store.persist(chat.messages);
-
-      // AIの返答が完了したら要件定義書をバックグラウンドで更新
-      const lastMessage = chat.messages[chat.messages.length - 1];
-      if (lastMessage.role === 'assistant' && !chat.isLoading) {
-        handleUpdateRequirement(chat.messages);
-      }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chat.messages, chat.isLoading, store.nodes, store.edges]);
+  }, [chat.messages, store.nodes, store.edges]);
 
   const handleReset = useCallback(() => {
     if (!window.confirm('会話とキャンバスをリセットしますか？')) return;
     clearSavedProject();
     store.reset();
-    // messagesリセット: useChatSessionのsetMessagesを利用
     chat.setMessages([INITIAL_MESSAGE]);
-  }, [store, chat]);
-
-  // CanvasPane/ExportModal から引数なしで呼ばれるラッパー（最新のmessagesを自動で渡す）
-  const handleUpdateRequirementNow = useCallback(() => {
-    handleUpdateRequirement(chat.messages);
-  }, [handleUpdateRequirement, chat.messages]);
+    agent.reset();
+  }, [store, chat, agent]);
 
   return (
     <div className="flex h-screen w-full bg-white font-sans overflow-hidden">
@@ -120,24 +110,27 @@ export default function App() {
         onRemoveNode={store.removeNode}
         onAddEdge={store.addEdge}
         onNodeDragStop={(nodeId, position) => {
-          // ドラッグ後の位置をストアに反映（保存対象）
           store.setNodes(prev => prev.map(n =>
             n.id === nodeId ? { ...n, position } : n
           ));
         }}
         onShowExport={() => setShowExport(true)}
-        requirementDoc={requirementDoc}
-        isUpdatingDoc={isUpdatingDoc}
-        onUpdateRequirement={handleUpdateRequirementNow}
+        requirementDoc={agent.requirementDoc}
+        isUpdatingDoc={agent.isUpdatingDoc}
+        onUpdateRequirement={agent.requestRequirementUpdate}
+        consistencyResult={consistencyResult}
+        reviewReport={agent.reviewReport}
+        isGeneratingReview={agent.isGeneratingReview}
+        onGenerateReview={agent.requestReview}
       />
       {showExport && (
         <ExportModal
           nodes={store.nodes}
           edges={store.edges}
           messages={chat.messages}
-          requirementDoc={requirementDoc}
-          isUpdatingDoc={isUpdatingDoc}
-          onUpdateRequirement={handleUpdateRequirementNow}
+          requirementDoc={agent.requirementDoc}
+          isUpdatingDoc={agent.isUpdatingDoc}
+          onUpdateRequirement={agent.requestRequirementUpdate}
           onClose={() => setShowExport(false)}
         />
       )}
