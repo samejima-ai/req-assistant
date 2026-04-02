@@ -128,6 +128,7 @@ const defaultEdgeOptions = {
  *   reviewReport: string,
  *   isGeneratingReview: boolean,
  *   onGenerateReview: () => void,
+ *   onPushToChat: (text: string) => void,
  * }} props
  */
 function CanvasPane({ 
