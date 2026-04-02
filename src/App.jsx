@@ -127,10 +127,11 @@ export default function App() {
         <ExportModal
           nodes={store.nodes}
           edges={store.edges}
-          messages={chat.messages}
           requirementDoc={agent.requirementDoc}
           isUpdatingDoc={agent.isUpdatingDoc}
           onUpdateRequirement={agent.requestRequirementUpdate}
+          techConstraints={agent.techConstraints}
+          onUpdateTechConstraints={agent.setTechConstraints}
           onClose={() => setShowExport(false)}
         />
       )}

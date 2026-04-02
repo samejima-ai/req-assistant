@@ -1,18 +1,20 @@
 /**
  * ExportModal
  *
- * 責務: 構造化JSON + 要件定義書の生成・表示・結合コピー
+ * 責務: 構造化JSON + 要件定義書の生成・表示・MP出力コピー
  *
  * ARC原則:
  * - 要件定義書の生成は requirementDocService に委譲
- * - 3タブ構成（JSON / 要件定義書 / 結合出力）でユーザーに選択肢を提供
- * - 結合出力 = 要件定義書(Markdown) + JSON → エージェントに直接投入可能
+ * - Mermaid生成は mermaidFlowGenerator / mermaidErGenerator に委譲
+ * - 3タブ構成（JSON / 要件定義書 / MP出力）でユーザーに選択肢を提供
+ * - MP出力 = 要件定義書 + 画面フロー図(Mermaid) + ER図(Mermaid) + 技術制約 → 1ボタンコピー
  *
- * Input:  nodes, edges, messages, onClose
+ * Input:  nodes, edges, messages, techConstraints, onClose
  * Output: void (クリップボードへの副作用のみ)
  */
-import { useState, useEffect, useCallback } from 'react';
-import { generateRequirementDoc } from '../services/requirementDocService.js';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { generateScreenFlowMermaid } from '../utils/mermaidFlowGenerator.js';
+import { generateErMermaid } from '../utils/mermaidErGenerator.js';
 
 // ---------- Icons ----------
 const CopyIcon = () => (
@@ -45,23 +47,40 @@ const SpinnerIcon = () => (
 const TABS = [
   { id: 'json', label: '構造化JSON', icon: '{ }' },
   { id: 'doc', label: '要件定義書', icon: '📋' },
-  { id: 'combined', label: '結合出力', icon: '🚀' },
+  { id: 'mp', label: 'MP出力', icon: '🚀' },
 ];
+
+/**
+ * MP（Manifest Prompt）全体をMarkdown文字列に組み立てる
+ */
+function assembleMp({ requirementDoc, flowCode, erCode, techConstraints }) {
+  const sections = [];
+  if (requirementDoc) sections.push(requirementDoc);
+  if (flowCode) sections.push(`## 画面フロー図\n\`\`\`mermaid\n${flowCode}\n\`\`\``);
+  if (erCode) sections.push(`## ERダイアグラム\n\`\`\`mermaid\n${erCode}\n\`\`\``);
+  if (techConstraints) sections.push(`## 技術スタック・制約\n${techConstraints}`);
+  return sections.join('\n\n---\n\n');
+}
 
 /**
  * @param {{
  *   nodes: import('reactflow').Node[],
  *   edges: import('reactflow').Edge[],
- *   messages: Array<{role: string, content: string}>,
  *   requirementDoc: string,
  *   isUpdatingDoc: boolean,
  *   onUpdateRequirement: () => void,
+ *   techConstraints: string,
+ *   onUpdateTechConstraints: (value: string) => void,
  *   onClose: () => void
  * }} props
  */
-export default function ExportModal({ nodes, edges, messages, requirementDoc, isUpdatingDoc, onUpdateRequirement, onClose }) {
-  const [activeTab, setActiveTab] = useState('combined');
+export default function ExportModal({ nodes, edges, requirementDoc, isUpdatingDoc, onUpdateRequirement, techConstraints, onUpdateTechConstraints, onClose }) {
+  const [activeTab, setActiveTab] = useState('mp');
   const [copied, setCopied] = useState(false);
+
+  // Mermaidコード生成（純粋関数をuseMemoでキャッシュ）
+  const flowCode = useMemo(() => generateScreenFlowMermaid(nodes, edges), [nodes, edges]);
+  const erCode = useMemo(() => generateErMermaid(nodes, edges), [nodes, edges]);
 
   // ---------- JSON生成（既存ロジック） ----------
   const groupedEntities = nodes.reduce((acc, node) => {
@@ -91,10 +110,8 @@ export default function ExportModal({ nodes, edges, messages, requirementDoc, is
 
   const jsonText = JSON.stringify(exportData, null, 2);
 
-  // ---------- 結合テキスト ----------
-  const combinedText = requirementDoc
-    ? `${requirementDoc}\n\n---\n\n## 構造化データ（アプリフロー JSON）\n\n\`\`\`json\n${jsonText}\n\`\`\``
-    : `（要件定義書を生成中…）\n\n---\n\n## 構造化データ（アプリフロー JSON）\n\n\`\`\`json\n${jsonText}\n\`\`\``;
+  // ---------- MP出力テキスト ----------
+  const mpText = assembleMp({ requirementDoc, flowCode, erCode, techConstraints });
 
   // モーダル表示時にドキュメントが空なら自動生成を開始
   useEffect(() => {
@@ -113,9 +130,9 @@ export default function ExportModal({ nodes, edges, messages, requirementDoc, is
       case 'doc':
         text = requirementDoc || '（生成中）';
         break;
-      case 'combined':
+      case 'mp':
       default:
-        text = combinedText;
+        text = mpText || '（生成中）';
         break;
     }
 
@@ -123,7 +140,7 @@ export default function ExportModal({ nodes, edges, messages, requirementDoc, is
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
-  }, [activeTab, jsonText, requirementDoc, combinedText]);
+  }, [activeTab, jsonText, requirementDoc, mpText]);
 
   // ---------- タブごとのコンテンツ ----------
   const renderContent = () => {
@@ -141,25 +158,59 @@ export default function ExportModal({ nodes, edges, messages, requirementDoc, is
             {requirementDoc}
           </div>
         );
-      case 'combined':
+      case 'mp':
       default:
         return (
           <div className="space-y-4">
-            {isUpdatingDoc ? (
-              <LoadingSkeleton />
-            ) : (
-              <div className="whitespace-pre-wrap text-sm text-gray-200 leading-relaxed">
-                {requirementDoc}
+            {/* 技術スタック入力 */}
+            <div>
+              <label className="block text-xs text-gray-400 font-semibold uppercase tracking-wider mb-1">
+                技術スタック・制約 <span className="text-gray-600 normal-case font-normal">(任意)</span>
+              </label>
+              <textarea
+                value={techConstraints}
+                onChange={e => onUpdateTechConstraints(e.target.value)}
+                placeholder="例: React + TypeScript、Firebase Firestore、iOS/Android両対応"
+                rows={2}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500 resize-none"
+              />
+            </div>
+
+            <div className="border-t border-gray-700 pt-4">
+              <div className="text-xs text-gray-500 mb-2 font-semibold tracking-wide uppercase">── 要件定義書 ──</div>
+              {isUpdatingDoc ? (
+                <LoadingSkeleton />
+              ) : (
+                <div className="whitespace-pre-wrap text-sm text-gray-200 leading-relaxed">
+                  {requirementDoc || '（会話を始めると自動生成されます）'}
+                </div>
+              )}
+            </div>
+
+            {flowCode && (
+              <div className="border-t border-gray-700 pt-4">
+                <div className="text-xs text-gray-500 mb-2 font-semibold tracking-wide uppercase">── 画面フロー図 ──</div>
+                <pre className="whitespace-pre-wrap text-sm font-mono text-indigo-300 leading-relaxed">
+                  {`\`\`\`mermaid\n${flowCode}\n\`\`\``}
+                </pre>
               </div>
             )}
-            <div className="border-t border-gray-700 pt-4">
-              <div className="text-xs text-gray-500 mb-2 font-semibold tracking-wide uppercase">
-                ── 構造化データ（JSON） ──
+
+            {erCode && (
+              <div className="border-t border-gray-700 pt-4">
+                <div className="text-xs text-gray-500 mb-2 font-semibold tracking-wide uppercase">── ERダイアグラム ──</div>
+                <pre className="whitespace-pre-wrap text-sm font-mono text-green-300 leading-relaxed">
+                  {`\`\`\`mermaid\n${erCode}\n\`\`\``}
+                </pre>
               </div>
-              <pre className="whitespace-pre-wrap text-sm font-mono text-emerald-300 leading-relaxed">
-                {jsonText}
-              </pre>
-            </div>
+            )}
+
+            {techConstraints && (
+              <div className="border-t border-gray-700 pt-4">
+                <div className="text-xs text-gray-500 mb-2 font-semibold tracking-wide uppercase">── 技術スタック・制約 ──</div>
+                <div className="whitespace-pre-wrap text-sm text-gray-200 leading-relaxed">{techConstraints}</div>
+              </div>
+            )}
           </div>
         );
     }
@@ -238,7 +289,7 @@ export default function ExportModal({ nodes, edges, messages, requirementDoc, is
                 } disabled:opacity-50`}
             >
               {copied ? <CheckIcon /> : <CopyIcon />}
-              {copied ? 'コピー完了！' : (activeTab === 'combined' ? '結合出力をコピー' : 'コピー')}
+              {copied ? 'コピー完了！' : (activeTab === 'mp' ? 'MP全体をコピー' : 'コピー')}
             </button>
             <button
               onClick={onClose}
