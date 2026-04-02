@@ -75,7 +75,7 @@ export default function App() {
     if (chat.messages.length > 1) {
       store.persist(chat.messages);
     }
-  }, [chat.messages, store]);
+  }, [chat.messages, store.persist]);
 
   const handleReset = useCallback(() => {
     if (!window.confirm('会話とキャンバスをリセットしますか？')) return;
