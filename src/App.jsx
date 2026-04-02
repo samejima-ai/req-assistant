@@ -19,13 +19,11 @@
  *                          ← buildSystemContext（SSOT統合）
  * - CanvasPane      ← useAutoLayout, useWireframe（純粋計算）
  */
-import { useEffect, useCallback, useRef } from 'react';
-import { useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useCanvasStore } from './hooks/useCanvasStore.js';
 import { useChatSession, INITIAL_MESSAGE } from './hooks/useChatSession.js';
 import { loadSavedProject, clearSavedProject } from './hooks/useProjectStorage.js';
 import { useAgentOrchestrator } from './hooks/useAgentOrchestrator.js';
-import { toFlowNode, toFlowEdge } from './utils/layoutUtils.js';
 import ChatPane from './components/ChatPane.jsx';
 import CanvasPane from './components/CanvasPane.jsx';
 import ExportModal from './components/ExportModal.jsx';
@@ -42,10 +40,8 @@ function loadInitialState() {
 }
 
 export default function App() {
-  // useRefで初回レンダリング時のみlocalStorageを読む（再レンダリングで再実行しない）
-  const initialRef = useRef(null);
-  if (!initialRef.current) initialRef.current = loadInitialState();
-  const initial = initialRef.current;
+  // 初回のみlocalStorageから読み込む
+  const [initial] = useState(() => loadInitialState());
 
   const [showExport, setShowExport] = useState(false);
   const { chatWidthPercent, handleMouseDown } = usePaneResize();
@@ -54,7 +50,12 @@ export default function App() {
   const store = useCanvasStore(initial.nodes, initial.edges, initial.messages);
 
   // 会話セッション: ノード/エッジ更新はstoreに委譲
-  const chat = useChatSession(store.mergeNodesEdges, initial.messages);
+  // ゲッター経由で現在のキャンバス状態をgeminiServiceに渡す（クロージャ問題を回避）
+  const chat = useChatSession(
+    store.mergeNodesEdges,
+    initial.messages,
+    () => ({ nodes: store.nodes, edges: store.edges })
+  );
 
   // ルールベース自動整合性チェック（毎ターン自動実行・同期処理）
   const consistencyResult = useConsistencyCheck(store.nodes, store.edges);
@@ -69,19 +70,28 @@ export default function App() {
   );
 
   // 永続化のみの副作用（LLM処理は含まない・useAgentOrchestratorに移譲済み）
+  // 永続化のみの副作用
   useEffect(() => {
     if (chat.messages.length > 1) {
       store.persist(chat.messages);
     }
-  }, [chat.messages, store.nodes, store.edges]);
+  }, [chat.messages, store.persist]);
 
   const handleReset = useCallback(() => {
     if (!window.confirm('会話とキャンバスをリセットしますか？')) return;
     clearSavedProject();
     store.reset();
     chat.setMessages([INITIAL_MESSAGE]);
+    chat.setInputText('');
     agent.reset();
   }, [store, chat, agent]);
+
+  const handlePushToChat = useCallback((text) => {
+    chat.setInputText(prev => {
+      const separator = prev.trim() ? '\n' : '';
+      return prev + separator + text;
+    });
+  }, [chat]);
 
   return (
     <div className="flex h-screen w-full bg-white font-sans overflow-hidden">
@@ -90,10 +100,13 @@ export default function App() {
         <ChatPane
           messages={chat.messages}
           isLoading={chat.isLoading}
+          thinkingStatus={chat.thinkingStatus}
           error={chat.error}
           onSendMessage={chat.sendMessage}
           onClearError={chat.clearError}
           onReset={handleReset}
+          inputText={chat.inputText}
+          onInputChange={chat.setInputText}
         />
       </div>
 
@@ -109,6 +122,8 @@ export default function App() {
         onUpdateNodeData={store.updateNodeData}
         onRemoveNode={store.removeNode}
         onAddEdge={store.addEdge}
+        onUpdateEdgeData={store.updateEdgeData}
+        onRemoveEdge={store.removeEdge}
         onNodeDragStop={(nodeId, position) => {
           store.setNodes(prev => prev.map(n =>
             n.id === nodeId ? { ...n, position } : n
@@ -122,6 +137,7 @@ export default function App() {
         reviewReport={agent.reviewReport}
         isGeneratingReview={agent.isGeneratingReview}
         onGenerateReview={agent.requestReview}
+        onPushToChat={handlePushToChat}
       />
       {showExport && (
         <ExportModal

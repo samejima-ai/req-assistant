@@ -10,6 +10,7 @@
  */
 
 export const MODELS = {
+  intent:      import.meta.env.VITE_GEMINI_MODEL_INTENT       ?? 'gemini-2.0-flash-lite',
   chat:        import.meta.env.VITE_GEMINI_MODEL_CHAT         ?? 'gemini-3.1-flash-lite-preview',
   doc:         import.meta.env.VITE_GEMINI_MODEL_DOC          ?? 'gemini-3.1-flash-lite-preview',
   reviewLight: import.meta.env.VITE_GEMINI_MODEL_REVIEW_LIGHT ?? 'gemini-3-flash-preview',
@@ -17,6 +18,7 @@ export const MODELS = {
 };
 
 export const THINKING = {
+  intent:      'minimal',  // インテント分析は最小コスト（高速・低コスト優先）
   chat:        import.meta.env.VITE_GEMINI_THINKING_CHAT   ?? 'low',
   doc:         import.meta.env.VITE_GEMINI_THINKING_DOC    ?? 'medium',
   reviewLight: import.meta.env.VITE_GEMINI_THINKING_REVIEW ?? 'medium',

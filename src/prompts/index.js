@@ -14,14 +14,16 @@
  * - 外部URLからプロンプトを非同期ロードする機能
  */
 
-import { buildPrompt as buildChatPrompt }   from './chat.prompt.js';
-import { buildPrompt as buildDocPrompt }    from './requirementDoc.prompt.js';
-import { buildPrompt as buildReviewPrompt } from './review.prompt.js';
+import { buildPrompt as buildChatPrompt }    from './chat.prompt.js';
+import { buildPrompt as buildDocPrompt }     from './requirementDoc.prompt.js';
+import { buildPrompt as buildReviewPrompt }  from './review.prompt.js';
+import { buildPrompt as buildIntentPrompt }  from './intent.prompt.js';
 
 const STORAGE_KEY_PREFIX = 'req-assistant-prompt-';
 
 /** @type {Map<string, (variables?: object) => string>} */
 const DEFAULT_BUILDERS = new Map([
+  ['intent',         buildIntentPrompt],
   ['chat',           buildChatPrompt],
   ['requirementDoc', buildDocPrompt],
   ['review',         buildReviewPrompt],
@@ -90,5 +92,5 @@ export function resetToDefault(serviceId) {
  * 全サービスのカスタムプロンプトをクリアする
  */
 export function resetAllToDefault() {
-  ['chat', 'requirementDoc', 'review'].forEach(id => resetToDefault(id));
+  ['intent', 'chat', 'requirementDoc', 'review'].forEach(id => resetToDefault(id));
 }

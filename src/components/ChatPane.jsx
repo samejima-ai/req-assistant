@@ -4,14 +4,13 @@
  * 責務: メッセージ表示 + テキスト入力 + エラー通知
  *
  * ARC原則（疎結合）:
- * - ビジネスロジックを一切持たない純粋なUIコンポーネント
- * - 全ての状態とコールバックをpropsで受け取る
- * - 保存・API通信・セッション管理はApp/useChatSessionが担う
+ * - ビジネスロジックを最小限に抑えたUIコンポーネント
+ * - 入力状態 (inputText) は親 (App/useChatSession) で管理し、外部からの「流し込み」を可能にする
  *
- * Input:  messages, isLoading, error, onSendMessage, onClearError, onReset
+ * Input:  messages, isLoading, error, onSendMessage, onClearError, onReset, inputText, onInputChange
  * Output: void (コールバック経由)
  */
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 const SendIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -27,19 +26,47 @@ const ResetIcon = () => (
   </svg>
 );
 
-export default function ChatPane({ messages, isLoading, error, onSendMessage, onClearError, onReset }) {
-  const [inputText, setInputText] = useState('');
+export default function ChatPane({
+  messages,
+  isLoading,
+  thinkingStatus = '',
+  error,
+  onSendMessage,
+  onClearError,
+  onReset,
+  inputText,
+  onInputChange
+}) {
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
 
+  // メッセージ一覧の自動スクロール
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // textareaの自動伸縮
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    }
+  }, [inputText]);
+
   const handleSubmit = (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!inputText.trim() || isLoading) return;
     onSendMessage(inputText);
-    setInputText('');
+    onInputChange('');
+  };
+
+  const handleKeyDown = (e) => {
+    // Ctrl+Enter or Cmd+Enter for sending
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleSubmit();
+    }
   };
 
   return (
@@ -49,9 +76,9 @@ export default function ChatPane({ messages, isLoading, error, onSendMessage, on
         <div>
           <h1 className="text-lg font-bold text-gray-800 flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse"></span>
-            要件定義アシスタント
+            Vibe Architect
           </h1>
-          <p className="text-xs text-gray-500 mt-1">作りたいものを教えてください</p>
+          <p className="text-xs text-gray-500 mt-1">やりたいことを雰囲気で伝えてください</p>
         </div>
         <button
           onClick={onReset}
@@ -63,7 +90,7 @@ export default function ChatPane({ messages, isLoading, error, onSendMessage, on
         </button>
       </div>
 
-      {/* エラーバナー（retryable時のみ表示） */}
+      {/* エラーバナー */}
       {error && (
         <div className="mx-4 mt-3 p-2 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between text-xs text-red-600">
           <span>{error.code}: {error.message.slice(0, 60)}</span>
@@ -89,10 +116,13 @@ export default function ChatPane({ messages, isLoading, error, onSendMessage, on
 
         {isLoading && (
           <div className="flex items-start">
-            <div className="bg-white border border-gray-200 p-3 rounded-2xl rounded-bl-none shadow-sm flex gap-1.5">
+            <div className="bg-white border border-gray-200 p-3 rounded-2xl rounded-bl-none shadow-sm flex items-center gap-1.5">
               <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
               <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
               <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+              {thinkingStatus && (
+                <span className="text-xs text-gray-400 ml-1">{thinkingStatus}</span>
+              )}
             </div>
           </div>
         )}
@@ -101,23 +131,32 @@ export default function ChatPane({ messages, isLoading, error, onSendMessage, on
 
       {/* 入力フォーム */}
       <form onSubmit={handleSubmit} className="p-4 bg-white border-t border-gray-200">
-        <div className="relative flex items-center">
-          <input
-            type="text"
-            value={inputText}
-            onChange={e => setInputText(e.target.value)}
-            placeholder="要件を入力..."
-            className="w-full pl-4 pr-12 py-3 bg-gray-100 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none transition-all text-sm"
-            disabled={isLoading}
-          />
+        <div className="relative flex items-end gap-2">
+          <div className="flex-1 relative">
+            <textarea
+              ref={textareaRef}
+              rows="1"
+              value={inputText}
+              onChange={e => onInputChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="メッセージを入力... (Ctrl+Enterで送信)"
+              className="w-full pl-4 pr-4 py-3 bg-gray-100 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none transition-all text-sm resize-none overflow-y-auto block"
+              disabled={isLoading}
+              style={{ minHeight: '44px', maxHeight: '200px' }}
+            />
+          </div>
           <button
             type="submit"
             disabled={!inputText.trim() || isLoading}
-            className="absolute right-2 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-md flex-shrink-0"
+            title="送信 (Ctrl+Enter)"
           >
             <SendIcon />
           </button>
         </div>
+        <p className="text-[10px] text-gray-400 mt-2 ml-1">
+          Enterで改行 / Ctrl+Enterで送信
+        </p>
       </form>
     </div>
   );

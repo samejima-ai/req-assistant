@@ -13,7 +13,7 @@
  *
  * 依存: geminiService, layoutUtils
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { extractRequirements } from '../services/geminiService.js';
 import { toFlowNode, toFlowEdge } from '../utils/layoutUtils.js';
 
@@ -25,12 +25,18 @@ export const INITIAL_MESSAGE = {
 /**
  * @param {(nodes: import('reactflow').Node[], edges: import('reactflow').Edge[]) => void} onUpdate
  * @param {Array} [initialMessages]
+ * @param {(() => { nodes: Array, edges: Array }) | null} [getNodesEdges] - 現在のキャンバス状態ゲッター
  */
-export function useChatSession(onUpdate, initialMessages) {
+export function useChatSession(onUpdate, initialMessages, getNodesEdges = null) {
   const [messages, setMessages] = useState(initialMessages ?? [INITIAL_MESSAGE]);
+  const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [thinkingStatus, setThinkingStatus] = useState('');
   // エラー状態: { code, message, retryable } | null
   const [error, setError] = useState(null);
+  // getNodesEdges は毎レンダーで変わりうるため ref で保持してクロージャ問題を回避
+  const getNodesEdgesRef = useRef(getNodesEdges);
+  getNodesEdgesRef.current = getNodesEdges;
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -43,9 +49,13 @@ export function useChatSession(onUpdate, initialMessages) {
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
     setIsLoading(true);
+    setThinkingStatus('');
+
+    // 現在のキャンバス状態を取得（ゲッターが未設定の場合は空配列）
+    const { nodes = [], edges = [] } = getNodesEdgesRef.current?.() ?? {};
 
     // Success path（nextMessagesを渡すことでクロージャによる古い参照を回避）
-    const result = await extractRequirements(nextMessages, text);
+    const result = await extractRequirements(nextMessages, text, nodes, edges, setThinkingStatus);
 
     if (result.ok) {
       const { chatReply, nodes, edges } = result.value;
@@ -68,8 +78,9 @@ export function useChatSession(onUpdate, initialMessages) {
       setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
     }
 
+    setThinkingStatus('');
     setIsLoading(false);
   }, [messages, isLoading, onUpdate]);
 
-  return { messages, setMessages, isLoading, error, clearError, sendMessage };
+  return { messages, setMessages, inputText, setInputText, isLoading, thinkingStatus, error, clearError, sendMessage };
 }

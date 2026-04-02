@@ -15,6 +15,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { generateScreenFlowMermaid } from '../utils/mermaidFlowGenerator.js';
 import { generateErMermaid } from '../utils/mermaidErGenerator.js';
+import { buildSystemContext, serializeDomainForPrompt } from '../types/systemContext.js';
 
 // ---------- Icons ----------
 const CopyIcon = () => (
@@ -53,9 +54,10 @@ const TABS = [
 /**
  * MP（Manifest Prompt）全体をMarkdown文字列に組み立てる
  */
-function assembleMp({ requirementDoc, flowCode, erCode, techConstraints }) {
+function assembleMp({ requirementDoc, nodesSummary, flowCode, erCode, techConstraints }) {
   const sections = [];
   if (requirementDoc) sections.push(requirementDoc);
+  if (nodesSummary) sections.push(`## ノード・エッジ一覧\n${nodesSummary}`);
   if (flowCode) sections.push(`## 画面フロー図\n\`\`\`mermaid\n${flowCode}\n\`\`\``);
   if (erCode) sections.push(`## ERダイアグラム\n\`\`\`mermaid\n${erCode}\n\`\`\``);
   if (techConstraints) sections.push(`## 技術スタック・制約\n${techConstraints}`);
@@ -81,6 +83,11 @@ export default function ExportModal({ nodes, edges, requirementDoc, isUpdatingDo
   // Mermaidコード生成（純粋関数をuseMemoでキャッシュ）
   const flowCode = useMemo(() => generateScreenFlowMermaid(nodes, edges), [nodes, edges]);
   const erCode = useMemo(() => generateErMermaid(nodes, edges), [nodes, edges]);
+  // ノード・エッジの構造化テキスト（各ノードのラベル・説明・型・エッジフローを含む）
+  const nodesSummary = useMemo(() => {
+    if (nodes.length === 0) return '';
+    return serializeDomainForPrompt(buildSystemContext([], nodes, edges));
+  }, [nodes, edges]);
 
   // ---------- JSON生成（既存ロジック） ----------
   const groupedEntities = nodes.reduce((acc, node) => {
@@ -111,7 +118,7 @@ export default function ExportModal({ nodes, edges, requirementDoc, isUpdatingDo
   const jsonText = JSON.stringify(exportData, null, 2);
 
   // ---------- MP出力テキスト ----------
-  const mpText = assembleMp({ requirementDoc, flowCode, erCode, techConstraints });
+  const mpText = assembleMp({ requirementDoc, nodesSummary, flowCode, erCode, techConstraints });
 
   // モーダル表示時にドキュメントが空なら自動生成を開始
   useEffect(() => {
@@ -186,6 +193,15 @@ export default function ExportModal({ nodes, edges, requirementDoc, isUpdatingDo
                 </div>
               )}
             </div>
+
+            {nodesSummary && (
+              <div className="border-t border-gray-700 pt-4">
+                <div className="text-xs text-gray-500 mb-2 font-semibold tracking-wide uppercase">── ノード・エッジ一覧 ──</div>
+                <pre className="whitespace-pre-wrap text-sm font-mono text-yellow-200 leading-relaxed">
+                  {nodesSummary}
+                </pre>
+              </div>
+            )}
 
             {flowCode && (
               <div className="border-t border-gray-700 pt-4">
