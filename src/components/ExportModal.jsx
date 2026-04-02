@@ -13,7 +13,6 @@
  * Output: void (クリップボードへの副作用のみ)
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { generateRequirementDoc } from '../services/requirementDocService.js';
 import { generateScreenFlowMermaid } from '../utils/mermaidFlowGenerator.js';
 import { generateErMermaid } from '../utils/mermaidErGenerator.js';
 
@@ -67,7 +66,6 @@ function assembleMp({ requirementDoc, flowCode, erCode, techConstraints }) {
  * @param {{
  *   nodes: import('reactflow').Node[],
  *   edges: import('reactflow').Edge[],
- *   messages: Array<{role: string, content: string}>,
  *   requirementDoc: string,
  *   isUpdatingDoc: boolean,
  *   onUpdateRequirement: () => void,
@@ -76,7 +74,7 @@ function assembleMp({ requirementDoc, flowCode, erCode, techConstraints }) {
  *   onClose: () => void
  * }} props
  */
-export default function ExportModal({ nodes, edges, messages, requirementDoc, isUpdatingDoc, onUpdateRequirement, techConstraints, onUpdateTechConstraints, onClose }) {
+export default function ExportModal({ nodes, edges, requirementDoc, isUpdatingDoc, onUpdateRequirement, techConstraints, onUpdateTechConstraints, onClose }) {
   const [activeTab, setActiveTab] = useState('mp');
   const [copied, setCopied] = useState(false);
 

@@ -41,7 +41,7 @@ export function generateScreenFlowMermaid(nodes, edges) {
       // Actor → Action → UI_Component のケースも探す
       if (target?.type === 'Action') {
         for (const e2 of edges) {
-          if ((e2.source === target.id || e2.type === 'screen_transition') && e2.source === target.id) {
+          if (e2.source === target.id) {
             const dest = nodes.find(n => n.id === e2.target);
             if (dest?.type === 'UI_Component') {
               entryTargets.add(dest.id);
@@ -74,7 +74,7 @@ export function generateScreenFlowMermaid(nodes, edges) {
       const actionLabel = (dst.data.label ?? '').replace(/"/g, "'");
       // このActionからつながるUI_Componentへのエッジを探す
       for (const e2 of edges) {
-        if (e2.source === dst.id) {
+        if (e2.source === dst.id && e2.type === 'screen_transition') {
           const dest2 = nodes.find(n => n.id === e2.target);
           if (dest2?.type === 'UI_Component') {
             lines.push(`  ${src.id} --> ${dest2.id} : ${actionLabel}`);

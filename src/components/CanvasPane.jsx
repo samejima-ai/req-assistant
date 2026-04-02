@@ -104,11 +104,9 @@ const defaultEdgeOptions = {
  *   reviewReport: string,
  *   isGeneratingReview: boolean,
  *   onGenerateReview: () => void,
- *   techConstraints: string,
- *   onUpdateTechConstraints: (value: string) => void,
  * }} props
  */
-function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, onNodeDragStop, onShowExport, requirementDoc, isUpdatingDoc, onUpdateRequirement, consistencyResult, reviewReport, isGeneratingReview, onGenerateReview, techConstraints, onUpdateTechConstraints }) {
+function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, onNodeDragStop, onShowExport, requirementDoc, isUpdatingDoc, onUpdateRequirement, consistencyResult, reviewReport, isGeneratingReview, onGenerateReview }) {
   const [rightPanel, setRightPanel] = useState('none'); // 'none', 'wireframe', 'requirement', 'review', 'diagram'
   const [diagramSubTab, setDiagramSubTab] = useState('flow'); // 'flow', 'er'
   const [showDiagramCode, setShowDiagramCode] = useState(false);
@@ -362,18 +360,14 @@ function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, o
                             style={{ cursor: 'default' }}
                             dangerouslySetInnerHTML={{ __html: diagramSubTab === 'flow' ? flowSvg : erSvg }}
                             onClick={(e) => {
-                              // SVG内のstate/entity要素クリックを検出
-                              // mermaidが生成するSVGのノード要素はdata属性なしのため、
-                              // テキスト内容からnodeIdを逆引きする
-                              const clickedEl = e.target.closest('g.node, g.state, g.er.entityBox');
-                              if (!clickedEl) return;
-                              // SVG内のラベルテキストを取得
-                              const textEl = clickedEl.querySelector('text, .label, foreignObject');
-                              const svgLabel = textEl?.textContent?.trim();
-                              if (!svgLabel) return;
-                              // ラベルからnodeを逆引き
+                              // mermaid SVGはノードIDをid属性に埋め込む（例: "flowchart-nodeId-N"）
+                              // ラベルではなくid属性でノードを逆引きすることで、重複ラベルやエスケープ問題を回避
                               const targetType = diagramSubTab === 'flow' ? 'UI_Component' : 'Data_Entity';
-                              const matchedNode = nodes.find(n => n.type === targetType && n.data.label === svgLabel);
+                              const svgEl = e.target.closest('[id]');
+                              if (!svgEl) return;
+                              const matchedNode = nodes.find(n =>
+                                n.type === targetType && svgEl.id?.includes(n.id)
+                              );
                               if (!matchedNode) return;
                               setEditingNodeId(matchedNode.id);
                               setEditingNodeLabel(matchedNode.data.label ?? '');

@@ -122,14 +122,11 @@ export default function App() {
         reviewReport={agent.reviewReport}
         isGeneratingReview={agent.isGeneratingReview}
         onGenerateReview={agent.requestReview}
-        techConstraints={agent.techConstraints}
-        onUpdateTechConstraints={agent.setTechConstraints}
       />
       {showExport && (
         <ExportModal
           nodes={store.nodes}
           edges={store.edges}
-          messages={chat.messages}
           requirementDoc={agent.requirementDoc}
           isUpdatingDoc={agent.isUpdatingDoc}
           onUpdateRequirement={agent.requestRequirementUpdate}
