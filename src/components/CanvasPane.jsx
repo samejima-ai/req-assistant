@@ -15,10 +15,10 @@
  */
 import ReactFlow, {
   Controls, MiniMap, Background, BackgroundVariant,
-  addEdge, MarkerType, ReactFlowProvider
+  MarkerType, ReactFlowProvider
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { useCallback, useRef, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useAutoLayout } from '../hooks/useAutoLayout.js';
 import { useWireframe } from '../hooks/useWireframe.js';
 import { useMermaidDiagram } from '../hooks/useMermaidDiagram.js';
@@ -44,7 +44,14 @@ function markdownToHtmlDoc(md) {
   h3 { font-size: 0.9rem; font-weight: 600; color: #374151; margin-top: 14px; margin-bottom: 6px; }
   p { margin: 6px 0; }
   ul, ol { padding-left: 1.4em; margin: 6px 0; }
-  li { margin: 3px 0; }
+  li { margin: 3px 0; position: relative; padding-right: 30px; }
+  li:hover .action-btn { opacity: 1; }
+  .action-btn { 
+    position: absolute; right: 0; top: 0; opacity: 0; 
+    cursor: pointer; background: #3b82f6; color: white; border: none; 
+    border-radius: 4px; font-size: 10px; padding: 2px 6px; 
+    transition: opacity 0.2s;
+  }
   strong { color: #111827; }
   em { color: #6b7280; }
   code { background: #f3f4f6; padding: 1px 5px; border-radius: 3px; font-size: 0.85em; }
@@ -58,6 +65,18 @@ function markdownToHtmlDoc(md) {
 </head>
 <body>
 ${body}
+<script>
+  // リストアイテムに「チャットに送る」ボタンを動的に追加
+  document.querySelectorAll('li').forEach(li => {
+    const btn = document.createElement('button');
+    btn.className = 'action-btn';
+    btn.innerText = '提案';
+    btn.onclick = () => {
+      window.parent.postMessage({ type: 'push_to_chat', text: li.innerText.replace('提案', '').trim() }, '*');
+    };
+    li.appendChild(btn);
+  });
+</script>
 </body>
 </html>`;
 }
@@ -95,6 +114,8 @@ const defaultEdgeOptions = {
  *   onUpdateNodeData: (nodeId: string, data: object) => void,
  *   onRemoveNode: (nodeId: string) => void,
  *   onAddEdge: (edge: import('reactflow').Edge) => void,
+ *   onUpdateEdgeData: (edgeId: string, data: object) => void,
+ *   onRemoveEdge: (edgeId: string) => void,
  *   onNodeDragStop: (nodeId: string, position: {x,y}) => void,
  *   onShowExport: () => void,
  *   requirementDoc: string,
@@ -106,9 +127,27 @@ const defaultEdgeOptions = {
  *   onGenerateReview: () => void,
  * }} props
  */
-function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, onNodeDragStop, onShowExport, requirementDoc, isUpdatingDoc, onUpdateRequirement, consistencyResult, reviewReport, isGeneratingReview, onGenerateReview }) {
+function CanvasPane({ 
+  nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, 
+  onUpdateEdgeData, onRemoveEdge, onNodeDragStop, onShowExport, 
+  requirementDoc, isUpdatingDoc, onUpdateRequirement, 
+  consistencyResult, reviewReport, isGeneratingReview, 
+  onGenerateReview, onPushToChat 
+}) {
   const [rightPanel, setRightPanel] = useState('none'); // 'none', 'wireframe', 'requirement', 'review', 'diagram'
+  const [activeEdgeType, setActiveEdgeType] = useState('screen_transition');
   const [diagramSubTab, setDiagramSubTab] = useState('flow'); // 'flow', 'er'
+
+  // iframeからのメッセージ（チャットへの流し込み）をハンドル
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data?.type === 'push_to_chat') {
+        onPushToChat(event.data.text);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [onPushToChat]);
   const [showDiagramCode, setShowDiagramCode] = useState(false);
   // 双方向編集: クリックされたノードのIDを管理
   const [editingNodeId, setEditingNodeId] = useState(null);
@@ -138,12 +177,30 @@ function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, o
       const edge = {
         ...params,
         id: `edge_manual_${Date.now()}`,
+        type: activeEdgeType,
         markerEnd: { type: MarkerType.ArrowClosed }
       };
       onAddEdge(edge);
     },
-    [onAddEdge]
+    [onAddEdge, activeEdgeType]
   );
+
+  const onEdgeContextMenu = useCallback((e, edge) => {
+    e.preventDefault();
+    const choice = window.prompt(`エッジ操作を選択:\n1: 削除\n2: 画面遷移に変更\n3: データフローに変更\n4: 操作に変更\n5: API呼び出しに変更\nその他: キャンセル`);
+
+    if (choice === '1') {
+      onRemoveEdge(edge.id);
+    } else if (choice === '2') {
+      onUpdateEdgeData(edge.id, { type: 'screen_transition' });
+    } else if (choice === '3') {
+      onUpdateEdgeData(edge.id, { type: 'data_flow' });
+    } else if (choice === '4') {
+      onUpdateEdgeData(edge.id, { type: 'actor_action' });
+    } else if (choice === '5') {
+      onUpdateEdgeData(edge.id, { type: 'api_call' });
+    }
+  }, [onRemoveEdge, onUpdateEdgeData]);
 
   const onNodeContextMenu = useCallback((e, node) => {
     e.preventDefault();
@@ -228,18 +285,39 @@ function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, o
         </button>
       </div>
 
-      {/* 凡例 */}
-      <div className="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur border border-gray-200 p-3 rounded-lg shadow-sm text-xs text-gray-600 flex flex-col gap-1.5">
+      {/* 凡例 & エッジ種別選択 */}
+      <div className="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur border border-gray-200 p-3 rounded-lg shadow-sm text-xs text-gray-600 flex flex-col gap-1.5 min-w-[140px]">
         <div className="font-semibold text-gray-700 mb-1">ノード種別</div>
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-yellow-100 border border-yellow-300"></span>アクター</div>
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-blue-100 border border-blue-300"></span>処理 / アクション</div>
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-pink-100 border border-pink-300"></span>UI / 画面</div>
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-100 border border-green-300"></span>データ</div>
-        <div className="border-t border-gray-200 mt-1 pt-1 font-semibold text-gray-700">エッジ種別</div>
-        <div className="flex items-center gap-1.5"><span className="w-5 h-0.5 bg-blue-500"></span>画面遷移</div>
-        <div className="flex items-center gap-1.5"><span className="w-5 h-0.5 bg-green-500 border-t border-dashed"></span>データフロー</div>
-        <div className="flex items-center gap-1.5"><span className="w-5 h-0.5 bg-yellow-500"></span>操作</div>
-        <div className="text-gray-400 mt-1">右クリックでノード削除</div>
+        
+        <div className="border-t border-gray-200 mt-1 pt-1 font-semibold text-gray-700">接続種別 (選択して作成)</div>
+        <button
+          onClick={() => setActiveEdgeType('screen_transition')}
+          className={`group flex items-center gap-1.5 p-1 rounded transition-all ${activeEdgeType === 'screen_transition' ? 'bg-blue-50 ring-1 ring-blue-500' : 'hover:bg-gray-100'}`}
+        >
+          <span className={`w-5 h-0.5 ${activeEdgeType === 'screen_transition' ? 'bg-blue-600' : 'bg-blue-400 opacity-60'}`}></span>
+          <span className={activeEdgeType === 'screen_transition' ? 'font-bold text-blue-700' : ''}>画面遷移</span>
+        </button>
+        <button
+          onClick={() => setActiveEdgeType('data_flow')}
+          className={`group flex items-center gap-1.5 p-1 rounded transition-colors ${activeEdgeType === 'data_flow' ? 'bg-green-50 ring-1 ring-green-500' : 'hover:bg-gray-100'}`}
+        >
+          <span className={`w-5 h-0.5 border-t border-dashed ${activeEdgeType === 'data_flow' ? 'bg-green-600 border-green-600' : 'bg-green-400 border-green-400 opacity-60'}`}></span>
+          <span className={activeEdgeType === 'data_flow' ? 'font-bold text-green-700' : ''}>データフロー</span>
+        </button>
+        <button
+          onClick={() => setActiveEdgeType('actor_action')}
+          className={`group flex items-center gap-1.5 p-1 rounded transition-colors ${activeEdgeType === 'actor_action' ? 'bg-yellow-50 ring-1 ring-yellow-500' : 'hover:bg-gray-100'}`}
+        >
+          <span className={`w-5 h-0.5 ${activeEdgeType === 'actor_action' ? 'bg-yellow-600' : 'bg-yellow-400 opacity-60'}`}></span>
+          <span className={activeEdgeType === 'actor_action' ? 'font-bold text-yellow-700' : ''}>操作</span>
+        </button>
+        <div className="text-[10px] text-gray-400 mt-1 border-t border-gray-100 pt-1">
+          右クリック：ノード/エッジ削除・変更
+        </div>
       </div>
 
       <ReactFlow
@@ -247,6 +325,7 @@ function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, o
         edges={edges}
         onConnect={onConnect}
         onNodeContextMenu={onNodeContextMenu}
+        onEdgeContextMenu={onEdgeContextMenu}
         onNodeDragStop={handleNodeDragStop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
@@ -360,14 +439,12 @@ function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, o
                             style={{ cursor: 'default' }}
                             dangerouslySetInnerHTML={{ __html: diagramSubTab === 'flow' ? flowSvg : erSvg }}
                             onClick={(e) => {
-                              // mermaid SVGはノードIDをid属性に埋め込む（例: "flowchart-nodeId-N"）
-                              // ラベルではなくid属性でノードを逆引きすることで、重複ラベルやエスケープ問題を回避
-                              const targetType = diagramSubTab === 'flow' ? 'UI_Component' : 'Data_Entity';
-                              const svgEl = e.target.closest('[id]');
-                              if (!svgEl) return;
-                              const matchedNode = nodes.find(n =>
-                                n.type === targetType && svgEl.id?.includes(n.id)
-                              );
+                              // useMermaidDiagramがSVG後処理でdata-node-id属性を注入済み。
+                              // id属性パターン照合より安定しており、チャットターンが増えてもstaleにならない。
+                              const el = e.target.closest('[data-node-id]');
+                              if (!el) return;
+                              const nodeId = el.getAttribute('data-node-id');
+                              const matchedNode = nodes.find(n => n.id === nodeId);
                               if (!matchedNode) return;
                               setEditingNodeId(matchedNode.id);
                               setEditingNodeLabel(matchedNode.data.label ?? '');
@@ -451,9 +528,19 @@ function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, o
                     ) : (
                       <ul className="flex flex-col gap-1.5">
                         {consistencyResult.issues.map(issue => (
-                          <li key={issue.id} className={`flex items-start gap-1.5 text-xs rounded px-2 py-1.5 ${issue.severity === 'error' ? 'bg-red-50 text-red-700' : 'bg-yellow-50 text-yellow-800'}`}>
+                          <li key={issue.id} className={`group flex items-start gap-1.5 text-xs rounded px-2 py-1.5 ${issue.severity === 'error' ? 'bg-red-50 text-red-700' : 'bg-yellow-50 text-yellow-800'}`}>
                             <span className="flex-shrink-0 mt-0.5">{issue.severity === 'error' ? '✗' : '⚠'}</span>
-                            <span>{issue.message}</span>
+                            <span className="flex-1">{issue.message}</span>
+                            <button
+                              onClick={() => onPushToChat(`【修正依頼】${issue.message}`)}
+                              className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-black/5 rounded transition-opacity"
+                              title="チャットに送る"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                              </svg>
+                            </button>
                           </li>
                         ))}
                       </ul>

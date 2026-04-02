@@ -28,7 +28,7 @@ function extractFields(description) {
  * @param {string} label
  * @returns {string}
  */
-function toEntityName(label) {
+export function toEntityName(label) {
   return (label ?? 'Entity').replace(/\s+/g, '_').replace(/[^\w\u3000-\u9FFF\u30A0-\u30FF\u3040-\u309F]/g, '_');
 }
 

@@ -22,6 +22,8 @@ import { ok, fail } from '../types/result.js';
 import { MODELS, THINKING } from './geminiConfig.js';
 import { callGenerateContent } from './geminiClient.js';
 import { getPrompt } from '../prompts/index.js';
+import { analyzeIntent, buildEnrichedMessage } from './intentService.js';
+import { buildSystemContext, serializeDomainForPrompt } from '../types/systemContext.js';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -37,18 +39,27 @@ const REQUEST_TIMEOUT_MS = 30000;
  *
  * @param {Array<{role: string, content: string}>} history
  * @param {string} userMessage
+ * @param {Array} [nodes] - 現在のキャンバスノード（グラフ状態コンテキスト用）
+ * @param {Array} [edges] - 現在のキャンバスエッジ（グラフ状態コンテキスト用）
+ * @param {((status: string) => void) | null} [onStatus] - 処理フェーズ通知コールバック
  * @returns {Promise<import('../types/result.js').Result<{chatReply: string, nodes: Array, edges: Array}>>}
  */
-export async function extractRequirements(history, userMessage) {
+export async function extractRequirements(history, userMessage, nodes = [], edges = [], onStatus = null) {
   if (!API_KEY) {
     // APIキーなし → モックで即座に成功を返す
     return ok(getMockResponse(userMessage));
   }
 
-  const contextNote = buildContextNote(history);
-  const contents = buildContents(history, userMessage + contextNote);
-  // 既存ノードIDを会話履歴から抽出（normalize()でエッジ検証に使う）
-  const existingNodeIds = extractExistingNodeIds(history);
+  // インテント前処理: ユーザー入力を分析してコンテキストを付与する（失敗時はフォールバック）
+  onStatus?.('インテントを分析中...');
+  const intent = await analyzeIntent(userMessage, history);
+  onStatus?.('設計図を生成中...');
+  const enrichedMessage = intent ? buildEnrichedMessage(userMessage, intent) : userMessage;
+
+  const contextNote = buildContextNote(nodes, edges);
+  const contents = buildContents(history, enrichedMessage + contextNote);
+  // 既存ノードIDをキャンバス状態から抽出（normalize()でエッジ検証に使う）
+  const existingNodeIds = extractExistingNodeIds(nodes);
 
   let retries = MAX_RETRIES;
   let delay = INITIAL_RETRY_DELAY_MS;
@@ -148,24 +159,27 @@ function normalize(parsed, existingNodeIds = new Set()) {
   };
 }
 
-function buildContextNote(history) {
-  const ids = new Set();
-  for (const msg of history) {
-    for (const m of msg.content.matchAll(/node_\d{3}/g)) ids.add(m[0]);
-  }
-  return ids.size > 0 ? `\n既存ノードID: ${[...ids].join(', ')}` : '';
+/**
+ * 現在のグラフ状態を構造化テキストとしてコンテキストノートに変換する
+ * ノードのラベル・説明・型、エッジのフロー構造を Gemini に渡し、文脈理解を向上させる
+ *
+ * @param {Array} nodes - 現在のキャンバスノード
+ * @param {Array} edges - 現在のキャンバスエッジ
+ */
+function buildContextNote(nodes, edges) {
+  if (nodes.length === 0) return '';
+  const ctx = buildSystemContext([], nodes, edges);
+  return '\n\n---\n[現在の設計図（既存ノード/エッジ）]\n' + serializeDomainForPrompt(ctx);
 }
 
 /**
- * 会話履歴から既存ノードIDのSetを抽出する
- * （geminiServiceが過去に生成したノードを認識するため）
+ * 現在のノード配列から既存ノードIDのSetを抽出する
+ * （エッジ参照バリデーション用）
+ *
+ * @param {Array} nodes - 現在のキャンバスノード
  */
-function extractExistingNodeIds(history) {
-  const ids = new Set();
-  for (const msg of history) {
-    for (const m of msg.content.matchAll(/node_\d{3}/g)) ids.add(m[0]);
-  }
-  return ids;
+function extractExistingNodeIds(nodes) {
+  return new Set(nodes.map(n => n.id));
 }
 
 function buildContents(history, text) {

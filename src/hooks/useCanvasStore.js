@@ -7,18 +7,13 @@
  *   このストアを経由して反映し、App/CanvasPane の二重管理を解消
  * - 副作用（localStorage保存）はここで一元管理
  *
- * Input:  initialNodes[], initialEdges[]  (localStorageから復元)
+ * Input:  initialNodes[], initialEdges[] (localStorageから復元)
  * Output: nodes, edges, および各種mutate関数
  */
 import { useState, useCallback } from 'react';
 import { saveProject } from './useProjectStorage.js';
 
-/**
- * @param {import('reactflow').Node[]} initialNodes
- * @param {import('reactflow').Edge[]} initialEdges
- * @param {Array}                      initialMessages
- */
-export function useCanvasStore(initialNodes, initialEdges, initialMessages) {
+export function useCanvasStore(initialNodes, initialEdges) {
   const [nodes, setNodes] = useState(initialNodes);
   const [edges, setEdges] = useState(initialEdges);
 
@@ -26,8 +21,6 @@ export function useCanvasStore(initialNodes, initialEdges, initialMessages) {
 
   /**
    * 新規ノード/エッジをマージ（IDが重複するものはスキップ）
-   * Input:  ReactFlow Node[], ReactFlow Edge[]
-   * Output: void（内部状態を不変的に更新）
    */
   const mergeNodesEdges = useCallback((newNodes, newEdges) => {
     setNodes(prev => {
@@ -41,14 +34,10 @@ export function useCanvasStore(initialNodes, initialEdges, initialMessages) {
   }, []);
 
   /**
-   * CanvasPaneのReactFlow内部からノード変更を受け取る（ドラッグ・インライン編集）
-   * ReactFlow の onNodesChange に渡す代わりにこれを使う
-   * Input:  ReactFlow NodeChange[]
-   * Output: void
+   * CanvasPaneのReactFlow内部からノード変更を受け取る
    */
   const applyNodeChanges = useCallback((changes) => {
     setNodes(prev => {
-      // position変更と data変更（インライン編集）を不変的に適用
       return prev.map(node => {
         const change = changes.find(c => c.id === node.id);
         if (!change) return node;
@@ -76,8 +65,7 @@ export function useCanvasStore(initialNodes, initialEdges, initialMessages) {
   }, []);
 
   /**
-   * ノード1件のdataを更新（インライン編集の結果反映用）
-   * Input:  nodeId: string, newData: Partial<NodeData>
+   * ノード1件のdataを更新
    */
   const updateNodeData = useCallback((nodeId, newData) => {
     setNodes(prev =>
@@ -86,8 +74,16 @@ export function useCanvasStore(initialNodes, initialEdges, initialMessages) {
   }, []);
 
   /**
+   * エッジ1件のプロパティを更新（種別変更など）
+   */
+  const updateEdgeData = useCallback((edgeId, newData) => {
+    setEdges(prev =>
+      prev.map(e => e.id === edgeId ? { ...e, ...newData } : e)
+    );
+  }, []);
+
+  /**
    * ノードとそれに繋がるエッジを削除
-   * Input:  nodeId: string
    */
   const removeNode = useCallback((nodeId) => {
     setNodes(prev => prev.filter(n => n.id !== nodeId));
@@ -95,7 +91,14 @@ export function useCanvasStore(initialNodes, initialEdges, initialMessages) {
   }, []);
 
   /**
-   * 手動でエッジを追加（ReactFlow の onConnect から）
+   * エッジ1件を削除
+   */
+  const removeEdge = useCallback((edgeId) => {
+    setEdges(prev => prev.filter(e => e.id !== edgeId));
+  }, []);
+
+  /**
+   * 手動でエッジを追加
    */
   const addEdge = useCallback((edge) => {
     setEdges(prev => {
@@ -105,7 +108,7 @@ export function useCanvasStore(initialNodes, initialEdges, initialMessages) {
   }, []);
 
   /**
-   * 全状態をリセット（不変: 新しい空配列を生成）
+   * 全状態をリセット
    */
   const reset = useCallback(() => {
     setNodes([]);
@@ -113,9 +116,7 @@ export function useCanvasStore(initialNodes, initialEdges, initialMessages) {
   }, []);
 
   /**
-   * 現在のnodes/edges/messagesをlocalStorageに保存
-   * messagesはuseChatSessionが持つため、呼び出し側から渡す
-   * Input:  messages: Array
+   * localStorageに保持
    */
   const persist = useCallback((messages) => {
     saveProject(nodes, edges, messages);
@@ -124,13 +125,15 @@ export function useCanvasStore(initialNodes, initialEdges, initialMessages) {
   return {
     nodes,
     edges,
-    setNodes,      // ReactFlowProviderのuseNodesState代替として直接渡す
+    setNodes,
     setEdges,
     mergeNodesEdges,
     applyNodeChanges,
     applyEdgeChanges,
     updateNodeData,
+    updateEdgeData,
     removeNode,
+    removeEdge,
     addEdge,
     reset,
     persist,
