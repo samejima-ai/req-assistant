@@ -72,7 +72,10 @@ ${body}
     btn.className = 'action-btn';
     btn.innerText = '提案';
     btn.onclick = () => {
-      window.parent.postMessage({ type: 'push_to_chat', text: li.innerText.replace('提案', '').trim() }, '*');
+      window.parent.postMessage(
+        { type: 'push_to_chat', text: li.innerText.replace('提案', '').trim() },
+        window.location.origin
+      );
     };
     li.appendChild(btn);
   });
