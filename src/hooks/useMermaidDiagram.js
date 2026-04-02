@@ -89,12 +89,12 @@ function injectDataNodeIds(svg, nodes, nodeType) {
     }
   } else if (nodeType === 'Data_Entity') {
     // erDiagram: エンティティ名（toEntityName変換後）でSVGのid属性を検索し逆引き
-    // SVGのidパターン例: id="erDiagram-EntityName-N"
+    // SVGのidパターン: id="erDiagram-${entityName}-N" （N は数値）
     for (const node of targets) {
       const entityName = toEntityName(node.data.label ?? 'Entity');
       const escaped = escapeRegex(entityName);
       result = result.replace(
-        new RegExp(`(<g[^>]*\\bid="[^"]*${escaped}[^"]*")`, 'g'),
+        new RegExp(`(<g[^>]*\\bid="erDiagram-${escaped}-\\d+")`, 'g'),
         `$1 data-node-id="${node.id}" data-node-type="${nodeType}"`
       );
     }
