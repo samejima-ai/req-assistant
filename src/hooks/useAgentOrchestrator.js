@@ -32,6 +32,7 @@ export function useAgentOrchestrator(messages, isLoading, nodes, edges) {
   const [isUpdatingDoc, setIsUpdatingDoc] = useState(false);
   const [reviewReport, setReviewReport] = useState('');
   const [isGeneratingReview, setIsGeneratingReview] = useState(false);
+  const [techConstraints, setTechConstraints] = useState('');
 
   // センチネル: 前回の要件定義書更新をトリガーしたメッセージ数を記録
   // これにより「同じターンで2回発火」を防ぐ
@@ -120,6 +121,7 @@ export function useAgentOrchestrator(messages, isLoading, nodes, edges) {
     setReviewReport('');
     setIsUpdatingDoc(false);
     setIsGeneratingReview(false);
+    setTechConstraints('');
     lastTriggeredAtRef.current = 0;
     if (docAbortRef.current) docAbortRef.current.abort();
   }, []);
@@ -129,6 +131,8 @@ export function useAgentOrchestrator(messages, isLoading, nodes, edges) {
     isUpdatingDoc,
     reviewReport,
     isGeneratingReview,
+    techConstraints,
+    setTechConstraints,
     requestRequirementUpdate,
     requestReview,
     reset,

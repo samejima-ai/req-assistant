@@ -122,6 +122,8 @@ export default function App() {
         reviewReport={agent.reviewReport}
         isGeneratingReview={agent.isGeneratingReview}
         onGenerateReview={agent.requestReview}
+        techConstraints={agent.techConstraints}
+        onUpdateTechConstraints={agent.setTechConstraints}
       />
       {showExport && (
         <ExportModal
@@ -131,6 +133,8 @@ export default function App() {
           requirementDoc={agent.requirementDoc}
           isUpdatingDoc={agent.isUpdatingDoc}
           onUpdateRequirement={agent.requestRequirementUpdate}
+          techConstraints={agent.techConstraints}
+          onUpdateTechConstraints={agent.setTechConstraints}
           onClose={() => setShowExport(false)}
         />
       )}

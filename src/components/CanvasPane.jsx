@@ -6,6 +6,7 @@
  * ARC原則:
  * - レイアウト計算 → useAutoLayout に委譲
  * - ワイヤーフレーム生成 → useWireframe に委譲
+ * - Mermaid図生成 → useMermaidDiagram に委譲
  * - ノード/エッジの状態変更 → useCanvasStore のコールバック経由（直接setNodes不可）
  * - onUpdateData を data に注入することで NodeBase がストアを直接触らない構造を維持
  *
@@ -20,6 +21,7 @@ import 'reactflow/dist/style.css';
 import { useCallback, useRef, useMemo, useState } from 'react';
 import { useAutoLayout } from '../hooks/useAutoLayout.js';
 import { useWireframe } from '../hooks/useWireframe.js';
+import { useMermaidDiagram } from '../hooks/useMermaidDiagram.js';
 import { marked } from 'marked';
 
 // marked の設定（改行を<br>に変換）
@@ -102,16 +104,26 @@ const defaultEdgeOptions = {
  *   reviewReport: string,
  *   isGeneratingReview: boolean,
  *   onGenerateReview: () => void,
+ *   techConstraints: string,
+ *   onUpdateTechConstraints: (value: string) => void,
  * }} props
  */
-function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, onNodeDragStop, onShowExport, requirementDoc, isUpdatingDoc, onUpdateRequirement, consistencyResult, reviewReport, isGeneratingReview, onGenerateReview }) {
-  const [rightPanel, setRightPanel] = useState('none'); // 'none', 'wireframe', 'requirement', 'review'
+function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, onNodeDragStop, onShowExport, requirementDoc, isUpdatingDoc, onUpdateRequirement, consistencyResult, reviewReport, isGeneratingReview, onGenerateReview, techConstraints, onUpdateTechConstraints }) {
+  const [rightPanel, setRightPanel] = useState('none'); // 'none', 'wireframe', 'requirement', 'review', 'diagram'
+  const [diagramSubTab, setDiagramSubTab] = useState('flow'); // 'flow', 'er'
+  const [showDiagramCode, setShowDiagramCode] = useState(false);
+  // 双方向編集: クリックされたノードのIDを管理
+  const [editingNodeId, setEditingNodeId] = useState(null);
+  const [editingNodeLabel, setEditingNodeLabel] = useState('');
 
   // レイアウト計算（SRP: useAutoLayoutに委譲）
   const { layoutedNodes, updatePosition } = useAutoLayout(nodes, edges);
 
   // ワイヤーフレーム生成（SRP: useWireframeに委譲）
   const wireframeHtml = useWireframe(layoutedNodes);
+
+  // Mermaid図生成（SRP: useMermaidDiagramに委譲）
+  const { flowSvg, erSvg, flowCode, erCode } = useMermaidDiagram(nodes, edges);
 
   // onUpdateData を各ノードの data に注入（NodeBase → ストアの橋渡し）
   // useMemoでメモ化: layoutedNodesまたはonUpdateNodeDataが変わったときのみ再生成
@@ -151,6 +163,17 @@ function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, o
     <div className="flex-1 min-w-0 h-full relative">
       {/* ツールバー */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">
+        {(flowSvg || erSvg) && (
+          <button
+            onClick={() => setRightPanel(p => p === 'diagram' ? 'none' : 'diagram')}
+            className={`flex items-center gap-2 px-4 py-2 border text-sm font-medium rounded-lg shadow-sm transition-colors ${rightPanel === 'diagram' ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="6" height="6" rx="1"/><rect x="16" y="3" width="6" height="6" rx="1"/><rect x="9" y="15" width="6" height="6" rx="1"/><path d="M5 9v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M12 12v3"/>
+            </svg>
+            フロー図
+          </button>
+        )}
         {wireframeHtml && (
           <button
             onClick={() => setRightPanel(p => p === 'wireframe' ? 'none' : 'wireframe')}
@@ -254,6 +277,14 @@ function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, o
         <div className="absolute top-0 right-0 bottom-0 w-96 bg-white border-l border-gray-200 shadow-2xl z-20 flex flex-col">
           <div className="p-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
             <div className="flex gap-1 p-1 bg-gray-200 rounded-lg">
+              {(flowSvg || erSvg) && (
+                <button
+                  onClick={() => setRightPanel('diagram')}
+                  className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${rightPanel === 'diagram' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  フロー図
+                </button>
+              )}
               <button
                 onClick={() => setRightPanel('requirement')}
                 className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${rightPanel === 'requirement' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
@@ -289,7 +320,118 @@ function CanvasPane({ nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, o
           </div>
 
           <div className="flex-1 flex flex-col overflow-hidden">
-            {rightPanel === 'wireframe' ? (
+            {rightPanel === 'diagram' ? (
+              <>
+                {/* サブタブ: 画面フロー / ER図 */}
+                <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+                  <div className="flex gap-1 bg-gray-100 rounded-md p-0.5">
+                    <button
+                      onClick={() => setDiagramSubTab('flow')}
+                      className={`px-3 py-1 text-xs font-bold rounded transition-all ${diagramSubTab === 'flow' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      画面フロー
+                    </button>
+                    <button
+                      onClick={() => setDiagramSubTab('er')}
+                      disabled={!erSvg}
+                      className={`px-3 py-1 text-xs font-bold rounded transition-all ${diagramSubTab === 'er' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'} disabled:opacity-30`}
+                    >
+                      ER図
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setShowDiagramCode(v => !v)}
+                    className="text-[10px] text-gray-400 hover:text-gray-600 px-2 py-1 border border-gray-200 rounded transition-colors"
+                  >
+                    {showDiagramCode ? 'プレビュー' : 'コードを見る'}
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-auto">
+                  {showDiagramCode ? (
+                    <pre className="p-4 text-xs font-mono text-gray-700 whitespace-pre-wrap">
+                      {diagramSubTab === 'flow' ? (flowCode || 'UI_Componentノードを追加すると生成されます') : (erCode || 'Data_Entityノードを追加すると生成されます')}
+                    </pre>
+                  ) : (
+                    <div className="p-3">
+                      {(diagramSubTab === 'flow' ? flowSvg : erSvg) ? (
+                        <>
+                          {/* SVGをReactツリーに直接埋め込み → クリックで双方向編集 */}
+                          <div
+                            className="mermaid-svg-container"
+                            style={{ cursor: 'default' }}
+                            dangerouslySetInnerHTML={{ __html: diagramSubTab === 'flow' ? flowSvg : erSvg }}
+                            onClick={(e) => {
+                              // SVG内のstate/entity要素クリックを検出
+                              // mermaidが生成するSVGのノード要素はdata属性なしのため、
+                              // テキスト内容からnodeIdを逆引きする
+                              const clickedEl = e.target.closest('g.node, g.state, g.er.entityBox');
+                              if (!clickedEl) return;
+                              // SVG内のラベルテキストを取得
+                              const textEl = clickedEl.querySelector('text, .label, foreignObject');
+                              const svgLabel = textEl?.textContent?.trim();
+                              if (!svgLabel) return;
+                              // ラベルからnodeを逆引き
+                              const targetType = diagramSubTab === 'flow' ? 'UI_Component' : 'Data_Entity';
+                              const matchedNode = nodes.find(n => n.type === targetType && n.data.label === svgLabel);
+                              if (!matchedNode) return;
+                              setEditingNodeId(matchedNode.id);
+                              setEditingNodeLabel(matchedNode.data.label ?? '');
+                            }}
+                          />
+                          <p className="text-[10px] text-gray-400 mt-2 text-center">ノードをクリックするとラベルを編集できます</p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-gray-400 text-center mt-8">
+                          {diagramSubTab === 'flow' ? 'UI_Componentノードを追加すると生成されます' : 'Data_Entityノードを追加すると生成されます'}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 双方向編集モーダル */}
+                {editingNodeId && (
+                  <div className="absolute inset-0 bg-black/40 z-30 flex items-center justify-center" onClick={() => setEditingNodeId(null)}>
+                    <div className="bg-white rounded-xl shadow-2xl p-5 w-72" onClick={e => e.stopPropagation()}>
+                      <h4 className="text-sm font-bold text-gray-800 mb-3">ノードを編集</h4>
+                      <label className="text-xs text-gray-500 font-medium">ラベル</label>
+                      <input
+                        type="text"
+                        value={editingNodeLabel}
+                        onChange={e => setEditingNodeLabel(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            onUpdateNodeData(editingNodeId, { label: editingNodeLabel });
+                            setEditingNodeId(null);
+                          }
+                          if (e.key === 'Escape') setEditingNodeId(null);
+                        }}
+                        autoFocus
+                        className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+                      />
+                      <div className="flex gap-2 mt-4 justify-end">
+                        <button
+                          onClick={() => setEditingNodeId(null)}
+                          className="px-3 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
+                        >
+                          キャンセル
+                        </button>
+                        <button
+                          onClick={() => {
+                            onUpdateNodeData(editingNodeId, { label: editingNodeLabel });
+                            setEditingNodeId(null);
+                          }}
+                          className="px-3 py-1.5 text-xs text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+                        >
+                          更新
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : rightPanel === 'wireframe' ? (
               <iframe className="flex-1 w-full border-none" srcDoc={wireframeHtml} title="wireframe" sandbox="allow-same-origin" />
             ) : rightPanel === 'review' ? (
               <>
