@@ -28,8 +28,8 @@ npm run dev
 
 ### 2. 稼働状況を確認する (Check)
 
-- **ターミナル:** `Local: http://localhost:5173/` が表示されていれば稼働中です。
-- **ブラウザ:** `http://localhost:5173/` を開き、画面が表示されれば正常です。
+- **ターミナル:** Vite の起動後に表示される `Local:` の行を確認します（例: `Local: http://localhost:5173/` や `Local: http://localhost:5174/`）。
+- **ブラウザ:** ターミナルに表示された `Local:` のURLを開き、画面が表示されれば正常です。
 
 ### 3. サーバーを停止する (Stop)
 
