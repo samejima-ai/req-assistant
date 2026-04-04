@@ -1,6 +1,6 @@
 # CURRENT STATUS — req-assistant
 
-最終更新: 2026-04-04（汎用的な文言への調整・APIキー設定UI・Vercelデプロイ対応）
+最終更新: 2026-04-04（汎用化対応・ExportModal不具合修正・Vercelデプロイ対応）
 
 ---
 
@@ -75,7 +75,7 @@
 
 ### ARC原則に基づいた責務分離
 
-```
+```text
 src/
 ├── hooks/          # 状態管理・副作用
 │   ├── useCanvasStore.js        # ノード/エッジ SSOT
@@ -135,7 +135,7 @@ src/
 
 `.env.local` に設定（`.env.example` 参照）:
 
-```
+```text
 VITE_GEMINI_API_KEY=         # Gemini API キー（必須。UIからも設定可能）
 VITE_GEMINI_MODEL_INTENT=    # インテント分析モデル（省略可、default: gemini-2.0-flash-lite）
 VITE_GEMINI_MODEL_CHAT=      # チャットモデル（省略可）
@@ -179,6 +179,7 @@ Node.js 20.19+ または 22.12+ が必要（22.11.0 は非対応）。
 | `current` | feat: MP出力にノード・エッジ一覧（ラベル・説明・型）を追加                        |
 | `current` | feat: Gemini APIキー設定UI (ApiKeyModal) & configService 実装                     |
 | `current` | feat: Vercelデプロイ対応 — ブラウザ側でのAPIキー設定・永続化をサポート            |
+| `f23822a` | fix: resolve whiteout and flickering when copying MP in ExportModal               |
 
 ---
 
