@@ -236,8 +236,8 @@ function CanvasPane({
 
   return (
     <div className={`flex-1 min-w-0 h-full relative ${isMobile ? 'pb-14' : ''}`}>
-      {/* ツールバー */}
-      <div className={`absolute top-4 right-4 z-10 flex ${isMobile ? 'gap-1.5' : 'gap-2'}`}>
+      {/* ツールバー (右上：FABと重ならないように右側にマージンを確保) */}
+      <div className={`absolute top-4 ${isMobile ? 'right-20' : 'right-24'} z-10 flex ${isMobile ? 'gap-1.5' : 'gap-2'}`}>
         {(flowSvg || erSvg) && (
           <button
             onClick={() => setRightPanel(p => p === 'diagram' ? 'none' : 'diagram')}
@@ -293,18 +293,6 @@ function CanvasPane({
             </span>
           )}
         </button>
-        
-        {/* 解説/凡例ボタン */}
-        <button
-          onClick={() => setShowLegend(!showLegend)}
-          className={toolbarBtnClass(showLegend, 'bg-gray-800', 'border-gray-800')}
-          title="解説と接続設定"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-          {!isMobile && '解説'}
-        </button>
 
         {!isMobile && (
           <button
@@ -321,64 +309,78 @@ function CanvasPane({
         )}
       </div>
 
-      {/* 凡例 & エッジ種別選択 (ポップオーバー) */}
-      {showLegend && (
-        <div className={`absolute top-16 right-4 z-20 bg-white/95 backdrop-blur border border-gray-200 p-4 rounded-xl shadow-2xl text-xs text-gray-600 flex flex-col gap-3 min-w-[200px] animate-in fade-in slide-in-from-top-2 duration-200`}>
-          <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-1">
-            <span className="font-bold text-gray-800">キャンバス解説</span>
-            <button onClick={() => setShowLegend(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
-          </div>
+      {/* 凡例 & エッジ種別選択 (右下の独立ボタン) */}
+      <div className={`absolute ${isMobile ? 'bottom-4' : 'bottom-6'} right-4 z-10 flex flex-col items-end`}>
+        {showLegend && (
+          <div className="mb-3 bg-white/95 backdrop-blur border border-gray-200 p-4 rounded-xl shadow-2xl text-xs text-gray-600 flex flex-col gap-3 min-w-[200px] animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-1">
+              <span className="font-bold text-gray-800">キャンバス解説</span>
+              <button onClick={() => setShowLegend(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
 
-          <div>
-            <div className="font-semibold text-gray-700 mb-2">ノード種別</div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-yellow-100 border border-yellow-300 flex-shrink-0"></span>アクター</div>
-              <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-blue-100 border border-blue-300 flex-shrink-0"></span>処理</div>
-              <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-pink-100 border border-pink-300 flex-shrink-0"></span>UI / 画面</div>
-              <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-green-100 border border-green-300 flex-shrink-0"></span>データ</div>
+            <div>
+              <div className="font-semibold text-gray-700 mb-2">ノード種別</div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-yellow-100 border border-yellow-300 flex-shrink-0"></span>アクター</div>
+                <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-blue-100 border border-blue-300 flex-shrink-0"></span>処理</div>
+                <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-pink-100 border border-pink-300 flex-shrink-0"></span>UI / 画面</div>
+                <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-green-100 border border-green-300 flex-shrink-0"></span>データ</div>
+              </div>
+            </div>
+            
+            <div className="border-t border-gray-100 pt-2">
+              <div className="font-semibold text-gray-700 mb-2">接続種別 (選択して作成)</div>
+              <div className="flex flex-col gap-1.5">
+                <button
+                  onClick={() => { setActiveEdgeType('screen_transition'); !isMobile && setShowLegend(false); }}
+                  className={`group flex items-center justify-between p-2 rounded transition-all ${activeEdgeType === 'screen_transition' ? 'bg-blue-50 ring-1 ring-blue-500' : 'hover:bg-gray-100'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`w-4 h-0.5 ${activeEdgeType === 'screen_transition' ? 'bg-blue-600' : 'bg-blue-400 opacity-60'}`}></span>
+                    <span className={activeEdgeType === 'screen_transition' ? 'font-bold text-blue-700' : ''}>画面遷移</span>
+                  </div>
+                  {activeEdgeType === 'screen_transition' && <span className="text-blue-500 text-[10px]">✓</span>}
+                </button>
+                <button
+                  onClick={() => { setActiveEdgeType('data_flow'); !isMobile && setShowLegend(false); }}
+                  className={`group flex items-center justify-between p-2 rounded transition-colors ${activeEdgeType === 'data_flow' ? 'bg-green-50 ring-1 ring-green-500' : 'hover:bg-gray-100'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`w-4 h-0.5 border-t border-dashed ${activeEdgeType === 'data_flow' ? 'bg-green-600 border-green-600' : 'bg-green-400 border-green-400 opacity-60'}`}></span>
+                    <span className={activeEdgeType === 'data_flow' ? 'font-bold text-green-700' : ''}>データフロー</span>
+                  </div>
+                  {activeEdgeType === 'data_flow' && <span className="text-green-500 text-[10px]">✓</span>}
+                </button>
+                <button
+                  onClick={() => { setActiveEdgeType('actor_action'); !isMobile && setShowLegend(false); }}
+                  className={`group flex items-center justify-between p-2 rounded transition-colors ${activeEdgeType === 'actor_action' ? 'bg-yellow-50 ring-1 ring-yellow-500' : 'hover:bg-gray-100'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`w-4 h-0.5 ${activeEdgeType === 'actor_action' ? 'bg-yellow-600' : 'bg-yellow-400 opacity-60'}`}></span>
+                    <span className={activeEdgeType === 'actor_action' ? 'font-bold text-yellow-700' : ''}>操作</span>
+                  </div>
+                  {activeEdgeType === 'actor_action' && <span className="text-yellow-500 text-[10px]">✓</span>}
+                </button>
+              </div>
+            </div>
+            <div className="text-[10px] text-gray-400 mt-1 border-t border-gray-50 pt-2 italic">
+              右クリックで削除・変更
             </div>
           </div>
-          
-          <div className="border-t border-gray-100 pt-2">
-            <div className="font-semibold text-gray-700 mb-2">接続種別 (選択して作成)</div>
-            <div className="flex flex-col gap-1.5">
-              <button
-                onClick={() => { setActiveEdgeType('screen_transition'); !isMobile && setShowLegend(false); }}
-                className={`group flex items-center justify-between p-2 rounded transition-all ${activeEdgeType === 'screen_transition' ? 'bg-blue-50 ring-1 ring-blue-500' : 'hover:bg-gray-100'}`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`w-4 h-0.5 ${activeEdgeType === 'screen_transition' ? 'bg-blue-600' : 'bg-blue-400 opacity-60'}`}></span>
-                  <span className={activeEdgeType === 'screen_transition' ? 'font-bold text-blue-700' : ''}>画面遷移</span>
-                </div>
-                {activeEdgeType === 'screen_transition' && <span className="text-blue-500 text-[10px]">✓</span>}
-              </button>
-              <button
-                onClick={() => { setActiveEdgeType('data_flow'); !isMobile && setShowLegend(false); }}
-                className={`group flex items-center justify-between p-2 rounded transition-colors ${activeEdgeType === 'data_flow' ? 'bg-green-50 ring-1 ring-green-500' : 'hover:bg-gray-100'}`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`w-4 h-0.5 border-t border-dashed ${activeEdgeType === 'data_flow' ? 'bg-green-600 border-green-600' : 'bg-green-400 border-green-400 opacity-60'}`}></span>
-                  <span className={activeEdgeType === 'data_flow' ? 'font-bold text-green-700' : ''}>データフロー</span>
-                </div>
-                {activeEdgeType === 'data_flow' && <span className="text-green-500 text-[10px]">✓</span>}
-              </button>
-              <button
-                onClick={() => { setActiveEdgeType('actor_action'); !isMobile && setShowLegend(false); }}
-                className={`group flex items-center justify-between p-2 rounded transition-colors ${activeEdgeType === 'actor_action' ? 'bg-yellow-50 ring-1 ring-yellow-500' : 'hover:bg-gray-100'}`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`w-4 h-0.5 ${activeEdgeType === 'actor_action' ? 'bg-yellow-600' : 'bg-yellow-400 opacity-60'}`}></span>
-                  <span className={activeEdgeType === 'actor_action' ? 'font-bold text-yellow-700' : ''}>操作</span>
-                </div>
-                {activeEdgeType === 'actor_action' && <span className="text-yellow-500 text-[10px]">✓</span>}
-              </button>
-            </div>
-          </div>
-          <div className="text-[10px] text-gray-400 mt-1 border-t border-gray-50 pt-2 italic">
-            キャンバス上のノード/エッジを右クリックで削除・変更できます
-          </div>
-        </div>
-      )}
+        )}
+
+        {/* 解説/凡例トリガーボタン (右下に常駐) */}
+        <button
+          onClick={() => setShowLegend(!showLegend)}
+          className={toolbarBtnClass(showLegend, 'bg-gray-800', 'border-gray-800')}
+          title="解説と接続設定"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          {!isMobile && <span className="ml-2">解説</span>}
+        </button>
+      </div>
 
       <ReactFlow
         nodes={nodesWithCallback}
