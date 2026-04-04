@@ -310,7 +310,7 @@ function CanvasPane({
       </div>
 
       {/* 凡例 & エッジ種別選択 (右下の独立ボタン) */}
-      <div className={`absolute ${isMobile ? 'bottom-4' : 'bottom-6'} right-4 z-10 flex flex-col items-end`}>
+      <div className={`absolute ${isMobile ? 'bottom-[72px]' : 'bottom-6'} right-4 z-10 flex flex-col items-end`}>
         {showLegend && (
           <div className="mb-3 bg-white/95 backdrop-blur border border-gray-200 p-4 rounded-xl shadow-2xl text-xs text-gray-600 flex flex-col gap-3 min-w-[200px] animate-in fade-in slide-in-from-bottom-2 duration-200">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-1">
