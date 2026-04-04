@@ -90,35 +90,42 @@ export default function ExportModal({ nodes, edges, requirementDoc, isUpdatingDo
   }, [nodes, edges]);
 
   // ---------- JSON生成（既存ロジック） ----------
-  const groupedEntities = nodes.reduce((acc, node) => {
-    const key = node.type;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(node.data.label);
-    return acc;
-  }, {});
+  const groupedEntities = useMemo(() => {
+    return nodes.reduce((acc, node) => {
+      const key = node.type;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(node.data.label);
+      return acc;
+    }, {});
+  }, [nodes]);
 
-  const relationships = edges.map(e => ({
-    from: nodes.find(n => n.id === e.source)?.data?.label ?? e.source,
-    to: nodes.find(n => n.id === e.target)?.data?.label ?? e.target,
-    type: e.type,
-    label: e.label ?? ''
-  }));
+  const relationships = useMemo(() => {
+    return edges.map(e => ({
+      from: nodes.find(n => n.id === e.source)?.data?.label ?? e.source,
+      to: nodes.find(n => n.id === e.target)?.data?.label ?? e.target,
+      type: e.type,
+      label: e.label ?? ''
+    }));
+  }, [nodes, edges]);
 
-  const exportData = {
-    project_context: 'ユーザーヒアリングから抽出された要件定義',
-    extracted_entities: {
-      actors: groupedEntities['Actor'] ?? [],
-      ui_components: groupedEntities['UI_Component'] ?? [],
-      data_entities: groupedEntities['Data_Entity'] ?? [],
-      actions: groupedEntities['Action'] ?? []
-    },
-    relationships
-  };
-
-  const jsonText = JSON.stringify(exportData, null, 2);
+  const jsonText = useMemo(() => {
+    const exportData = {
+      project_context: 'ユーザーヒアリングから抽出された要件定義',
+      extracted_entities: {
+        actors: groupedEntities['Actor'] ?? [],
+        ui_components: groupedEntities['UI_Component'] ?? [],
+        data_entities: groupedEntities['Data_Entity'] ?? [],
+        actions: groupedEntities['Action'] ?? []
+      },
+      relationships
+    };
+    return JSON.stringify(exportData, null, 2);
+  }, [groupedEntities, relationships]);
 
   // ---------- MP出力テキスト ----------
-  const mpText = assembleMp({ requirementDoc, nodesSummary, flowCode, erCode, techConstraints });
+  const mpText = useMemo(() => {
+    return assembleMp({ requirementDoc, nodesSummary, flowCode, erCode, techConstraints });
+  }, [requirementDoc, nodesSummary, flowCode, erCode, techConstraints]);
 
   // モーダル表示時にドキュメントが空なら自動生成を開始
   useEffect(() => {
@@ -128,7 +135,8 @@ export default function ExportModal({ nodes, edges, requirementDoc, isUpdatingDo
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------- コピー ----------
-  const handleCopy = useCallback(() => {
+  const handleCopy = useCallback(async (e) => {
+    if (e) e.stopPropagation();
     let text;
     switch (activeTab) {
       case 'json':
@@ -143,11 +151,33 @@ export default function ExportModal({ nodes, edges, requirementDoc, isUpdatingDo
         break;
     }
 
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+      } else {
+        // Fallback for non-secure contexts if needed
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+        setCopied(true);
+      }
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+    }
   }, [activeTab, jsonText, requirementDoc, mpText]);
+
+  // タイマーのクリーンアップ
+  useEffect(() => {
+    let timer;
+    if (copied) {
+      timer = setTimeout(() => setCopied(false), 2000);
+    }
+    return () => clearTimeout(timer);
+  }, [copied]);
 
   // ---------- タブごとのコンテンツ ----------
   const renderContent = () => {
