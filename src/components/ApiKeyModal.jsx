@@ -139,13 +139,14 @@ export default function ApiKeyModal({ onClose, onConfigSaved }) {
                 id="persist-key"
                 checked={persist}
                 onChange={(e) => setPersist(e.target.checked)}
+                aria-describedby="persist-key-description"
                 className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
               />
-              <div className="cursor-pointer" onClick={() => setPersist(!persist)}>
-                <label className="block text-sm font-medium text-gray-700 cursor-pointer">
+              <div>
+                <label htmlFor="persist-key" className="block text-sm font-medium text-gray-700 cursor-pointer">
                   このデバイスに保存する（推奨）
                 </label>
-                <p className="text-[11px] text-gray-500 leading-relaxed mt-0.5">
+                <p id="persist-key-description" className="text-[11px] text-gray-500 leading-relaxed mt-0.5">
                   チェックを入れると、次回以降も自動的にキーを維持します（localStorageを使用）。チェックを外すとタブを閉じた際にクリアされます（sessionStorageを使用）。
                 </p>
               </div>
