@@ -15,11 +15,12 @@
  * @param {import('reactflow').Edge[]} edges
  * @returns {string} Mermaid stateDiagram-v2 定義文字列
  */
-export function generateScreenFlowMermaid(nodes, edges) {
+export function generateScreenFlowMermaid(nodes, edges, direction = 'LR') {
   const uiNodes = nodes.filter(n => n.type === 'UI_Component');
   if (uiNodes.length === 0) return '';
 
   const lines = ['stateDiagram-v2'];
+  if (direction === 'TB') lines.push('  direction TB');
 
   // UI_Componentをstateとして定義
   for (const node of uiNodes) {

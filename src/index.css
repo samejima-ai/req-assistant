@@ -14,3 +14,18 @@ body {
 .react-flow__node {
   font-family: inherit;
 }
+
+/* バーガードロワー開放時のbodyスクロール禁止 */
+body.drawer-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+/* Mermaid SVGのモバイルオーバーフロー防止 */
+@media (max-width: 768px) {
+  .mermaid-svg-container svg {
+    max-width: 100%;
+    height: auto;
+  }
+}

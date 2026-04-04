@@ -15,7 +15,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { getLayoutedElements } from '../utils/layoutUtils.js';
 
-export function useAutoLayout(nodes, edges) {
+export function useAutoLayout(nodes, edges, direction = 'LR') {
   const [layoutedNodes, setLayoutedNodes] = useState(nodes);
   // 手動ドラッグしたノードIDのみ記録（「ピン留め」）
   const pinnedRef = useRef(new Map());
@@ -28,7 +28,7 @@ export function useAutoLayout(nodes, edges) {
     }
 
     // 全体レイアウトを計算
-    const { nodes: laid } = getLayoutedElements(nodes, edges);
+    const { nodes: laid } = getLayoutedElements(nodes, edges, direction);
 
     // ピン留めノードだけ手動位置を復元、それ以外はdagreの結果を使用
     const result = laid.map(n => {
@@ -37,7 +37,7 @@ export function useAutoLayout(nodes, edges) {
     });
 
     setLayoutedNodes(result);
-  }, [nodes, edges]);
+  }, [nodes, edges, direction]);
 
   /**
    * ユーザーがドラッグ完了したとき呼ぶ。

@@ -43,7 +43,8 @@ export default function ChatPane({
   onReset,
   onOpenSettings,
   inputText,
-  onInputChange
+  onInputChange,
+  isMobile = false
 }) {
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -88,24 +89,26 @@ export default function ChatPane({
           </h1>
           <p className="text-xs text-gray-500 mt-1">システム要件やアイデアを自由に入力してください</p>
         </div>
-        <div className="flex gap-3 mt-1">
-          <button
-            onClick={onOpenSettings}
-            title="APIキー設定"
-            className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-500 transition-colors"
-          >
-            <SettingsIcon />
-            設定
-          </button>
-          <button
-            onClick={onReset}
-            title="リセット"
-            className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition-colors"
-          >
-            <ResetIcon />
-            リセット
-          </button>
-        </div>
+        {!isMobile && (
+          <div className="flex gap-3 mt-1">
+            <button
+              onClick={onOpenSettings}
+              title="APIキー設定"
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-500 transition-colors"
+            >
+              <SettingsIcon />
+              設定
+            </button>
+            <button
+              onClick={onReset}
+              title="リセット"
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition-colors"
+            >
+              <ResetIcon />
+              リセット
+            </button>
+          </div>
+        )}
       </div>
 
       {/* エラーバナー */}
@@ -121,7 +124,7 @@ export default function ChatPane({
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
             <div
-              className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed shadow-sm whitespace-pre-wrap
+              className={`${isMobile ? 'max-w-[90%]' : 'max-w-[85%]'} p-3 rounded-2xl text-sm leading-relaxed shadow-sm whitespace-pre-wrap
                 ${msg.role === 'user'
                   ? 'bg-blue-600 text-white rounded-br-none'
                   : 'bg-white border border-gray-200 text-gray-700 rounded-bl-none'
@@ -148,7 +151,7 @@ export default function ChatPane({
       </div>
 
       {/* 入力フォーム */}
-      <form onSubmit={handleSubmit} className="p-4 bg-white border-t border-gray-200">
+      <form onSubmit={handleSubmit} className={`p-4 bg-white border-t border-gray-200 ${isMobile ? 'pb-[calc(1rem+56px)]' : ''}`}>
         <div className="relative flex items-end gap-2">
           <div className="flex-1 relative">
             <textarea
@@ -157,7 +160,7 @@ export default function ChatPane({
               value={inputText}
               onChange={e => onInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="メッセージを入力... (Ctrl+Enterで送信)"
+              placeholder={isMobile ? 'メッセージを入力...' : 'メッセージを入力... (Ctrl+Enterで送信)'}
               className="w-full pl-4 pr-4 py-3 bg-gray-100 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl outline-none transition-all text-sm resize-none overflow-y-auto block"
               disabled={isLoading}
               style={{ minHeight: '44px', maxHeight: '200px' }}
@@ -172,9 +175,11 @@ export default function ChatPane({
             <SendIcon />
           </button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-2 ml-1">
-          Enterで改行 / Ctrl+Enterで送信
-        </p>
+        {!isMobile && (
+          <p className="text-[10px] text-gray-400 mt-2 ml-1">
+            Enterで改行 / Ctrl+Enterで送信
+          </p>
+        )}
       </form>
     </div>
   );

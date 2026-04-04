@@ -131,12 +131,13 @@ const defaultEdgeOptions = {
  *   onPushToChat: (text: string) => void,
  * }} props
  */
-function CanvasPane({ 
-  nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge, 
-  onUpdateEdgeData, onRemoveEdge, onNodeDragStop, onShowExport, 
-  requirementDoc, isUpdatingDoc, onUpdateRequirement, 
-  consistencyResult, reviewReport, isGeneratingReview, 
-  onGenerateReview, onPushToChat 
+function CanvasPane({
+  nodes, edges, onUpdateNodeData, onRemoveNode, onAddEdge,
+  onUpdateEdgeData, onRemoveEdge, onNodeDragStop, onShowExport,
+  requirementDoc, isUpdatingDoc, onUpdateRequirement,
+  consistencyResult, reviewReport, isGeneratingReview,
+  onGenerateReview, onPushToChat,
+  isMobile = false
 }) {
   const [rightPanel, setRightPanel] = useState('none'); // 'none', 'wireframe', 'requirement', 'review', 'diagram'
   const [activeEdgeType, setActiveEdgeType] = useState('screen_transition');
@@ -157,14 +158,17 @@ function CanvasPane({
   const [editingNodeId, setEditingNodeId] = useState(null);
   const [editingNodeLabel, setEditingNodeLabel] = useState('');
 
+  // モバイルではTB（縦フロー）、デスクトップではLR（横フロー）
+  const layoutDirection = isMobile ? 'TB' : 'LR';
+
   // レイアウト計算（SRP: useAutoLayoutに委譲）
-  const { layoutedNodes, updatePosition } = useAutoLayout(nodes, edges);
+  const { layoutedNodes, updatePosition } = useAutoLayout(nodes, edges, layoutDirection);
 
   // ワイヤーフレーム生成（SRP: useWireframeに委譲）
   const wireframeHtml = useWireframe(layoutedNodes);
 
   // Mermaid図生成（SRP: useMermaidDiagramに委譲）
-  const { flowSvg, erSvg, flowCode, erCode } = useMermaidDiagram(nodes, edges);
+  const { flowSvg, erSvg, flowCode, erCode } = useMermaidDiagram(nodes, edges, layoutDirection);
 
   // onUpdateData を各ノードの data に注入（NodeBase → ストアの橋渡し）
   // useMemoでメモ化: layoutedNodesまたはonUpdateNodeDataが変わったときのみ再生成
@@ -219,7 +223,7 @@ function CanvasPane({
   }, [updatePosition, onNodeDragStop]);
 
   return (
-    <div className="flex-1 min-w-0 h-full relative">
+    <div className={`flex-1 min-w-0 h-full relative ${isMobile ? 'pb-14' : ''}`}>
       {/* ツールバー */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">
         {(flowSvg || erSvg) && (
@@ -276,17 +280,19 @@ function CanvasPane({
             </button>
           );
         })()}
-        <button
-          onClick={onShowExport}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-          設計データを出力
-        </button>
+        {!isMobile && (
+          <button
+            onClick={onShowExport}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            設計データを出力
+          </button>
+        )}
       </div>
 
       {/* 凡例 & エッジ種別選択 */}
@@ -340,10 +346,12 @@ function CanvasPane({
         // onNodesChange/onEdgesChange は使わない（ストアがSSOT）
       >
         <Controls />
-        <MiniMap nodeColor={(n) => {
-          const colors = { Actor: '#fef08a', UI_Component: '#fbcfe8', Data_Entity: '#bbf7d0', Action: '#bfdbfe' };
-          return colors[n.type] ?? '#e5e7eb';
-        }} />
+        {!isMobile && (
+          <MiniMap nodeColor={(n) => {
+            const colors = { Actor: '#fef08a', UI_Component: '#fbcfe8', Data_Entity: '#bbf7d0', Action: '#bfdbfe' };
+            return colors[n.type] ?? '#e5e7eb';
+          }} />
+        )}
         <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} color="#cbd5e1" />
       </ReactFlow>
 

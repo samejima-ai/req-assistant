@@ -19,7 +19,7 @@
  *                          ← buildSystemContext（SSOT統合）
  * - CanvasPane      ← useAutoLayout, useWireframe（純粋計算）
  */
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useCanvasStore } from './hooks/useCanvasStore.js';
 import { useChatSession, INITIAL_MESSAGE } from './hooks/useChatSession.js';
 import { loadSavedProject, clearSavedProject } from './hooks/useProjectStorage.js';
@@ -31,6 +31,10 @@ import { usePaneResize } from './hooks/usePaneResize.js';
 import { useConsistencyCheck } from './hooks/useConsistencyCheck.js';
 import ApiKeyModal from './components/ApiKeyModal.jsx';
 import { hasApiKey } from './services/configService.js';
+import { useMobileDetect } from './hooks/useMobileDetect.js';
+import { useSwipeGesture } from './hooks/useSwipeGesture.js';
+import MobileNav from './components/MobileNav.jsx';
+import BurgerMenu from './components/BurgerMenu.jsx';
 
 function loadInitialState() {
   const saved = loadSavedProject();
@@ -48,6 +52,16 @@ export default function App() {
   const [showExport, setShowExport] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(() => !hasApiKey());
   const { chatWidthPercent, handleMouseDown } = usePaneResize();
+
+  const { isMobile } = useMobileDetect();
+  const [activePanel, setActivePanel] = useState('chat');
+  const panelContainerRef = useRef(null);
+
+  useSwipeGesture(panelContainerRef, {
+    onSwipeLeft: () => setActivePanel('canvas'),
+    onSwipeRight: () => setActivePanel('chat'),
+    enabled: isMobile,
+  });
 
   // SSOT: ノード/エッジの全操作はこのストア経由
   const store = useCanvasStore(initial.nodes, initial.edges, initial.messages);
@@ -89,6 +103,15 @@ export default function App() {
     agent.reset();
   }, [store, chat, agent]);
 
+  // モバイル用: window.confirm なしで直接リセット（BurgerMenuのインライン確認から呼ぶ）
+  const handleResetConfirmed = useCallback(() => {
+    clearSavedProject();
+    store.reset();
+    chat.setMessages([INITIAL_MESSAGE]);
+    chat.setInputText('');
+    agent.reset();
+  }, [store, chat, agent]);
+
   const handlePushToChat = useCallback((text) => {
     chat.setInputText(prev => {
       const separator = prev.trim() ? '\n' : '';
@@ -96,22 +119,77 @@ export default function App() {
     });
   }, [chat]);
 
+  const canvasPaneProps = {
+    nodes: store.nodes,
+    edges: store.edges,
+    onUpdateNodeData: store.updateNodeData,
+    onRemoveNode: store.removeNode,
+    onAddEdge: store.addEdge,
+    onUpdateEdgeData: store.updateEdgeData,
+    onRemoveEdge: store.removeEdge,
+    onNodeDragStop: (nodeId, position) => {
+      store.setNodes(prev => prev.map(n =>
+        n.id === nodeId ? { ...n, position } : n
+      ));
+    },
+    onShowExport: () => setShowExport(true),
+    requirementDoc: agent.requirementDoc,
+    isUpdatingDoc: agent.isUpdatingDoc,
+    onUpdateRequirement: agent.requestRequirementUpdate,
+    consistencyResult,
+    reviewReport: agent.reviewReport,
+    isGeneratingReview: agent.isGeneratingReview,
+    onGenerateReview: agent.requestReview,
+    onPushToChat: handlePushToChat,
+  };
+
+  const chatPaneProps = {
+    messages: chat.messages,
+    isLoading: chat.isLoading,
+    thinkingStatus: chat.thinkingStatus,
+    error: chat.error,
+    onSendMessage: chat.sendMessage,
+    onClearError: chat.clearError,
+    onReset: handleReset,
+    onOpenSettings: () => setShowApiKeyModal(true),
+    inputText: chat.inputText,
+    onInputChange: chat.setInputText,
+  };
+
+  if (isMobile) {
+    return (
+      <div className="flex flex-col h-screen w-full overflow-hidden bg-white font-sans">
+        {/* パネルコンテナ: スワイプで切り替え */}
+        <div ref={panelContainerRef} className="flex-1 min-h-0 relative overflow-hidden">
+          <div className={`absolute inset-0 transition-transform duration-300 ease-out ${activePanel === 'chat' ? 'translate-x-0' : '-translate-x-full'}`}>
+            <ChatPane {...chatPaneProps} isMobile={true} />
+          </div>
+          <div className={`absolute inset-0 transition-transform duration-300 ease-out ${activePanel === 'canvas' ? 'translate-x-0' : 'translate-x-full'}`}>
+            <CanvasPane {...canvasPaneProps} isMobile={true} />
+          </div>
+        </div>
+
+        <BurgerMenu
+          onResetConfirmed={handleResetConfirmed}
+          nodes={store.nodes}
+          edges={store.edges}
+          requirementDoc={agent.requirementDoc}
+          isUpdatingDoc={agent.isUpdatingDoc}
+          onUpdateRequirement={agent.requestRequirementUpdate}
+          techConstraints={agent.techConstraints}
+          onUpdateTechConstraints={agent.setTechConstraints}
+        />
+
+        <MobileNav activePanel={activePanel} onSelectPanel={setActivePanel} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen w-full bg-white font-sans overflow-hidden">
       {/* ChatPane: 幅はドラッグで可変 */}
       <div style={{ width: `${chatWidthPercent}%`, flexShrink: 0 }} className="flex flex-col min-w-0">
-        <ChatPane
-          messages={chat.messages}
-          isLoading={chat.isLoading}
-          thinkingStatus={chat.thinkingStatus}
-          error={chat.error}
-          onSendMessage={chat.sendMessage}
-          onClearError={chat.clearError}
-          onReset={handleReset}
-          onOpenSettings={() => setShowApiKeyModal(true)}
-          inputText={chat.inputText}
-          onInputChange={chat.setInputText}
-        />
+        <ChatPane {...chatPaneProps} />
       </div>
 
       {/* ドラッグハンドル */}
@@ -120,29 +198,7 @@ export default function App() {
         className="w-1.5 flex-shrink-0 bg-gray-200 hover:bg-blue-400 active:bg-blue-500 cursor-col-resize transition-colors duration-150 z-30"
         title="ドラッグしてペイン幅を調整"
       />
-      <CanvasPane
-        nodes={store.nodes}
-        edges={store.edges}
-        onUpdateNodeData={store.updateNodeData}
-        onRemoveNode={store.removeNode}
-        onAddEdge={store.addEdge}
-        onUpdateEdgeData={store.updateEdgeData}
-        onRemoveEdge={store.removeEdge}
-        onNodeDragStop={(nodeId, position) => {
-          store.setNodes(prev => prev.map(n =>
-            n.id === nodeId ? { ...n, position } : n
-          ));
-        }}
-        onShowExport={() => setShowExport(true)}
-        requirementDoc={agent.requirementDoc}
-        isUpdatingDoc={agent.isUpdatingDoc}
-        onUpdateRequirement={agent.requestRequirementUpdate}
-        consistencyResult={consistencyResult}
-        reviewReport={agent.reviewReport}
-        isGeneratingReview={agent.isGeneratingReview}
-        onGenerateReview={agent.requestReview}
-        onPushToChat={handlePushToChat}
-      />
+      <CanvasPane {...canvasPaneProps} />
       {showExport && (
         <ExportModal
           nodes={store.nodes}
@@ -156,8 +212,8 @@ export default function App() {
         />
       )}
       {showApiKeyModal && (
-        <ApiKeyModal 
-          onClose={() => setShowApiKeyModal(false)} 
+        <ApiKeyModal
+          onClose={() => setShowApiKeyModal(false)}
         />
       )}
     </div>

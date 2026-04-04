@@ -107,7 +107,7 @@ function injectDataNodeIds(svg, nodes, nodeType) {
  * @param {import('reactflow').Node[]} nodes
  * @param {import('reactflow').Edge[]} edges
  */
-export function useMermaidDiagram(nodes, edges) {
+export function useMermaidDiagram(nodes, edges, direction = 'LR') {
   const [flowSvg, setFlowSvg] = useState('');
   const [erSvg, setErSvg] = useState('');
   const [flowCode, setFlowCode] = useState('');
@@ -117,7 +117,7 @@ export function useMermaidDiagram(nodes, edges) {
     // 初回useEffect実行時に初期化（モジュール評価時ではなくレンダリング後）
     ensureInitialized();
 
-    const fc = generateScreenFlowMermaid(nodes, edges);
+    const fc = generateScreenFlowMermaid(nodes, edges, direction);
     const ec = generateErMermaid(nodes, edges);
     setFlowCode(fc);
     setErCode(ec);
@@ -135,7 +135,7 @@ export function useMermaidDiagram(nodes, edges) {
     });
 
     return () => { cancelled = true; };
-  }, [nodes, edges]);
+  }, [nodes, edges, direction]);
 
   return { flowSvg, erSvg, flowCode, erCode };
 }
