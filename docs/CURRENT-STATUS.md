@@ -1,6 +1,6 @@
 # CURRENT STATUS — req-assistant
 
-最終更新: 2026-04-04（モバイルUI最適化 Phase 2・凡例メニュー統合・FAB刷新）
+最終更新: 2026-04-04（モバイルUI最適化 Phase 2・凡例メニュー統合・FAB刷新・FAB自動非表示機能追加）
 
 ---
 
@@ -73,6 +73,7 @@
 
 - **サイバー風グラデーションFAB** — メニューボタンを **右上** (`top-4 right-4`) に配置された円形グラデーションFAB（Floating Action Button）に刷新。設定・エクスポート機能をスマートに集約。
 - **独立した凡例・エッジ選択ボタン** — 凡例・接続種別選択メニューを、キャンバス **右下** の独立したボタンに配置。ナビゲーションバーとの重なりを避け、ポップオーバー形式で開閉可能に。
+- **FABの自動非表示** — フロー図や要件定義書などのサイドパネル（右パネル）展開時、右上FABを自動で隠すことで、パネルの閉じボタン等との干渉を防止。
 - **レスポンシブ・ツールバー** — モバイル時にはツールバーボタンをアイコンのみの円形ボタンに自動変換。画面上部でFABと重ならないよう位置を自動調整。
 - **サイドパネル全画面対応** — モバイル時に右パネル（要件定義・レビューなど）を全画面表示にするよう最適化。
 
@@ -191,7 +192,8 @@ Node.js 20.19+ または 22.12+ が必要（22.11.0 は非対応）。
 | `f36b104` | feat: integrate canvas legend into collapsible toolbar menu                       |
 | `52c82f6` | feat: finalize FAB position to top-right and Legend to bottom-right               |
 | `0731c78` | fix: adjust Legend button bottom position on mobile to avoid nav overlap          |
-| `current` | docs: update README and CURRENT-STATUS (Phase 2 OK)                               |
+| `821812d` | fix: hide BurgerMenu FAB when side panel is open on mobile to avoid obstruction   |
+| `current` | docs: finalize Mobile UI Optimization Phase 2 (FAB visibility fix etc.)           |
 
 ---
 
