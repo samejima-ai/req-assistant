@@ -8,7 +8,7 @@
  * - 疎通確認（テスト実行）
  */
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { setApiKey, clearApiKey, getApiKey } from '../services/configService.js';
 import { callGenerateContent } from '../services/geminiClient.js';
 import { MODELS } from '../services/geminiConfig.js';
