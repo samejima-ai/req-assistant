@@ -86,7 +86,7 @@ export default function ChatPane({
             <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse"></span>
             Vibe Architect
           </h1>
-          <p className="text-xs text-gray-500 mt-1">やりたいことを雰囲気で伝えてください</p>
+          <p className="text-xs text-gray-500 mt-1">システム要件やアイデアを自由に入力してください</p>
         </div>
         <div className="flex gap-3 mt-1">
           <button

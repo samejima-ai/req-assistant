@@ -19,7 +19,7 @@ import { toFlowNode, toFlowEdge } from '../utils/layoutUtils.js';
 
 export const INITIAL_MESSAGE = {
   role: 'assistant',
-  content: 'こんにちは！アプリ開発の要件定義アシスタントです。\n作りたいアプリについて、思いつくままに教えてください。\n例：「現場の職人さんがスマホで日報を書けるようにしたい」など、ふんわりとした内容で大丈夫です。'
+  content: 'こんにちは！要件定義アシスタントです。\nプロジェクトの要件やアイデアについて、自由に入力してください。\n内容を構造化し、可視化やドキュメント作成をお手伝いします。'
 };
 
 /**
