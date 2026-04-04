@@ -1,6 +1,6 @@
 # CURRENT STATUS — req-assistant
 
-最終更新: 2026-04-04（汎用化対応・ExportModal不具合修正・Vercelデプロイ対応）
+最終更新: 2026-04-04（モバイルUI最適化 Phase 2・凡例メニュー統合・FAB刷新）
 
 ---
 
@@ -68,6 +68,13 @@
 - **ペイン幅調整** — 左右ペイン比率を手動調整・保存
 - **カスタムプロンプト対応** — PromptRegistry でlocalStorageから動的切替
 - **Gemini APIキー設定UI** — 初回アクセス時のキー入力モーダル、疎通確認（テスト実行）、永続化（localStorage/sessionStorage）の選択に対応。Vercelデプロイ時のアクセシビリティを向上。
+
+### モバイル最適化（Phase 2）
+
+- **サイバー風グラデーションFAB** — 右上のメニューボタンを、右下（チャット時は左下）に配置された円形グラデーションFAB（Floating Action Button）に刷新。設定・エクスポート機能をスマートに集約。
+- **開閉式ツールバーメニュー** — 従来画面下部に固定されていた凡例・接続種別選択メニューを、右上のツールバー内「解説」ボタンに統合。ポップオーバー形式で開閉可能にし、キャンバス作業領域を大幅に拡張。
+- **レスポンシブ・ツールバー** — モバイル時にはツールバーボタンをアイコンのみの円形ボタンに自動変換し、横幅の狭いデバイスでも操作性を維持。
+- **サイドパネル全画面対応** — モバイル時に右パネル（要件定義・レビューなど）を全画面表示にするよう最適化。
 
 ---
 
@@ -180,6 +187,9 @@ Node.js 20.19+ または 22.12+ が必要（22.11.0 は非対応）。
 | `current` | feat: Gemini APIキー設定UI (ApiKeyModal) & configService 実装                     |
 | `current` | feat: Vercelデプロイ対応 — ブラウザ側でのAPIキー設定・永続化をサポート            |
 | `f23822a` | fix: resolve whiteout and flickering when copying MP in ExportModal               |
+| `8089bc7` | fix: move FAB to left and legend to right on mobile to avoid send button overlap  |
+| `f36b104` | feat: integrate canvas legend into collapsible toolbar menu                       |
+| `current` | docs: update README and CURRENT-STATUS for Mobile UI Optimization Phase 2         |
 
 ---
 
