@@ -311,7 +311,7 @@ function CanvasPane({
       </div>
 
       {/* 凡例 & エッジ種別選択 */}
-      <div className="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur border border-gray-200 p-3 rounded-lg shadow-sm text-xs text-gray-600 flex flex-col gap-1.5 min-w-[140px]">
+      <div className={`absolute bottom-4 ${isMobile ? 'right-4 pb-14' : 'left-4'} z-10 bg-white/90 backdrop-blur border border-gray-200 p-3 rounded-lg shadow-sm text-xs text-gray-600 flex flex-col gap-1.5 min-w-[140px]`}>
         <div className="font-semibold text-gray-700 mb-1">ノード種別</div>
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-yellow-100 border border-yellow-300"></span>アクター</div>
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-blue-100 border border-blue-300"></span>処理 / アクション</div>

@@ -116,7 +116,7 @@ export default function BurgerMenu({
       <button
         onClick={() => setIsOpen(v => !v)}
         aria-label="メニューを開く"
-        className={`fixed bottom-[72px] right-4 z-50 w-14 h-14 flex items-center justify-center rounded-full focus:outline-none transition-all duration-200 ${isOpen ? 'opacity-0 pointer-events-none scale-75' : 'opacity-100 scale-100 active:scale-90'}`}
+        className={`fixed bottom-[72px] left-4 z-50 w-14 h-14 flex items-center justify-center rounded-full focus:outline-none transition-all duration-200 ${isOpen ? 'opacity-0 pointer-events-none scale-75' : 'opacity-100 scale-100 active:scale-90'}`}
         style={{
           background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
           boxShadow: '0 4px 20px rgba(99,102,241,0.45)',
