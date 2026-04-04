@@ -26,6 +26,14 @@ const MenuIcon = () => (
   </svg>
 );
 
+const SparkleIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/>
+    <path d="M5 17l.75 2.25L8 20l-2.25.75L5 23l-.75-2.25L2 20l2.25-.75L5 17z"/>
+    <path d="M19 3l.5 1.5L21 5l-1.5.5L19 7l-.5-1.5L17 5l1.5-.5L19 3z"/>
+  </svg>
+);
+
 const CloseIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -104,13 +112,19 @@ export default function BurgerMenu({
 
   return (
     <>
-      {/* ハンバーガーボタン */}
+      {/* ハンバーガーボタン (FAB) */}
       <button
-        onClick={() => setIsOpen(true)}
-        className="fixed top-4 right-4 z-50 w-10 h-10 flex items-center justify-center bg-white border border-gray-200 rounded-xl shadow-md text-gray-700 hover:bg-gray-50 transition-colors"
+        onClick={() => setIsOpen(v => !v)}
         aria-label="メニューを開く"
+        className={`fixed bottom-[72px] right-4 z-50 w-14 h-14 flex items-center justify-center rounded-full focus:outline-none transition-all duration-200 ${isOpen ? 'opacity-0 pointer-events-none scale-75' : 'opacity-100 scale-100 active:scale-90'}`}
+        style={{
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          boxShadow: '0 4px 20px rgba(99,102,241,0.45)',
+        }}
       >
-        <MenuIcon />
+        <span className="text-white">
+          <SparkleIcon />
+        </span>
       </button>
 
       {/* バックドロップ */}
@@ -123,8 +137,12 @@ export default function BurgerMenu({
 
       {/* ドロワー */}
       <div
-        className={`fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-2xl shadow-2xl flex flex-col transition-transform duration-300 ease-out ${isOpen ? 'translate-y-0' : 'translate-y-full'}`}
-        style={{ maxHeight: '90vh', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        className={`fixed inset-x-0 z-50 bg-white rounded-t-2xl shadow-2xl flex flex-col transition-transform duration-300 ease-out ${isOpen ? 'translate-y-0' : 'translate-y-full'}`}
+        style={{
+          bottom: '56px',
+          maxHeight: 'calc(90vh - 56px)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+        }}
       >
         {/* ドラッグハンドル */}
         <div className="flex items-center justify-between px-5 pt-3 pb-2">

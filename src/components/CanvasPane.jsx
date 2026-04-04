@@ -222,35 +222,49 @@ function CanvasPane({
     onNodeDragStop?.(node.id, node.position);
   }, [updatePosition, onNodeDragStop]);
 
+  const toolbarBtnClass = (isActive, accentBg, accentBorder) => {
+    if (isMobile) {
+      return `w-9 h-9 flex items-center justify-center rounded-full shadow-md border transition-colors ${
+        isActive ? `${accentBg} text-white border-transparent` : 'bg-white/90 border-gray-300 text-gray-600'
+      }`;
+    }
+    return `flex items-center gap-2 px-4 py-2 border text-sm font-medium rounded-lg shadow-sm transition-colors ${
+      isActive ? `${accentBg} text-white ${accentBorder} hover:opacity-90` : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+    }`;
+  };
+
   return (
     <div className={`flex-1 min-w-0 h-full relative ${isMobile ? 'pb-14' : ''}`}>
       {/* ツールバー */}
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
+      <div className={`absolute top-4 right-4 z-10 flex ${isMobile ? 'gap-1.5' : 'gap-2'}`}>
         {(flowSvg || erSvg) && (
           <button
             onClick={() => setRightPanel(p => p === 'diagram' ? 'none' : 'diagram')}
-            className={`flex items-center gap-2 px-4 py-2 border text-sm font-medium rounded-lg shadow-sm transition-colors ${rightPanel === 'diagram' ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+            className={toolbarBtnClass(rightPanel === 'diagram', 'bg-indigo-600', 'border-indigo-600')}
+            title="フロー図"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="3" width="6" height="6" rx="1"/><rect x="16" y="3" width="6" height="6" rx="1"/><rect x="9" y="15" width="6" height="6" rx="1"/><path d="M5 9v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M12 12v3"/>
             </svg>
-            フロー図
+            {!isMobile && 'フロー図'}
           </button>
         )}
         {wireframeHtml && (
           <button
             onClick={() => setRightPanel(p => p === 'wireframe' ? 'none' : 'wireframe')}
-            className={`flex items-center gap-2 px-4 py-2 border text-sm font-medium rounded-lg shadow-sm transition-colors ${rightPanel === 'wireframe' ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+            className={toolbarBtnClass(rightPanel === 'wireframe', 'bg-purple-600', 'border-purple-600')}
+            title="ワイヤー"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
             </svg>
-            ワイヤー
+            {!isMobile && 'ワイヤー'}
           </button>
         )}
         <button
           onClick={() => setRightPanel(p => p === 'requirement' ? 'none' : 'requirement')}
-          className={`flex items-center gap-2 px-4 py-2 border text-sm font-medium rounded-lg shadow-sm transition-colors ${rightPanel === 'requirement' ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+          className={toolbarBtnClass(rightPanel === 'requirement', 'bg-blue-600', 'border-blue-600')}
+          title="要件定義"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -259,21 +273,22 @@ function CanvasPane({
             <line x1="16" y1="17" x2="8" y2="17"></line>
             <polyline points="10 9 9 9 8 9"></polyline>
           </svg>
-          要件定義
+          {!isMobile && '要件定義'}
         </button>
         {(() => {
           const totalIssues = (consistencyResult?.summary?.errors ?? 0) + (consistencyResult?.summary?.warnings ?? 0);
           return (
             <button
               onClick={() => setRightPanel(p => p === 'review' ? 'none' : 'review')}
-              className={`relative flex items-center gap-2 px-4 py-2 border text-sm font-medium rounded-lg shadow-sm transition-colors ${rightPanel === 'review' ? 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+              className={`relative ${toolbarBtnClass(rightPanel === 'review', 'bg-amber-600', 'border-amber-600')}`}
+              title="レビュー"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
               </svg>
-              レビュー
+              {!isMobile && 'レビュー'}
               {totalIssues > 0 && rightPanel !== 'review' && (
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                <span className={`absolute ${isMobile ? '-top-1 -right-1 w-4 h-4 text-[9px]' : '-top-1.5 -right-1.5 w-5 h-5 text-[10px]'} bg-red-500 text-white font-bold rounded-full flex items-center justify-center`}>
                   {totalIssues}
                 </span>
               )}
@@ -363,7 +378,7 @@ function CanvasPane({
 
       {/* サイドパネル（タブ切り替え） */}
       {rightPanel !== 'none' && (
-        <div className="absolute top-0 right-0 bottom-0 w-96 bg-white border-l border-gray-200 shadow-2xl z-20 flex flex-col">
+        <div className={`absolute top-0 right-0 bottom-0 bg-white border-l border-gray-200 shadow-2xl z-20 flex flex-col ${isMobile ? 'left-0 w-full' : 'w-96'}`}>
           <div className="p-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
             <div className="flex gap-1 p-1 bg-gray-200 rounded-lg">
               {(flowSvg || erSvg) && (
@@ -395,7 +410,7 @@ function CanvasPane({
                 {(() => {
                   const total = (consistencyResult?.summary?.errors ?? 0) + (consistencyResult?.summary?.warnings ?? 0);
                   return total > 0 && rightPanel !== 'review' ? (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{total}</span>
+                    <span className={`absolute ${isMobile ? '-top-1 -right-1 w-4 h-4 text-[9px]' : '-top-1 -right-1 w-4 h-4 text-[9px]'} bg-red-500 text-white font-bold rounded-full flex items-center justify-center`}>{total}</span>
                   ) : null;
                 })()}
               </button>
