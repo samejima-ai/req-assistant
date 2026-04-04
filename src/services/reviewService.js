@@ -21,8 +21,7 @@ import { MODELS, THINKING } from './geminiConfig.js';
 import { callGenerateContent } from './geminiClient.js';
 import { assessComplexity } from './complexityAssessor.js';
 import { getPrompt } from '../prompts/index.js';
-
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+import { hasApiKey } from './configService.js';
 
 const MAX_RETRIES = 2;
 const INITIAL_RETRY_DELAY_MS = 1000;
@@ -43,7 +42,7 @@ export async function generateReview(systemContext) {
     return ok(buildEmptyReport());
   }
 
-  if (!API_KEY) {
+  if (!hasApiKey()) {
     return ok(buildMockReport(nodes, edges));
   }
 
@@ -174,8 +173,8 @@ ${issues.length > 0 ? issues.join('\n') : '- 問題なし ✅'}
 ## 推奨アクション
 ${issues.length > 0 ? '1. 上記の問題を修正してから再度レビューを実行してください' : '1. 会話を続けて要件をさらに深掘りしてください'}
 
-> ⚠️ VITE_GEMINI_API_KEY が未設定のため、簡易レポートを表示しています。
-> API キーを設定すると、AIが詳細な矛盾・整合性分析を行います。`;
+> ⚠️ APIキーが設定されていないため、簡易レポートを表示しています。
+> 右上の「設定」からGemini APIキーを設定すると、AIによる詳細な分析が可能になります。`;
 }
 
 function buildEmptyReport() {

@@ -12,11 +12,7 @@
  * - SYSTEM_PROMPT 定数を削除し、getPrompt('chat') 経由で取得するように変更
  * - PromptRegistry によりプロンプトが localStorage カスタム or デフォルトを自動選択する
  *
- * Input:  history: Message[], userMessage: string
  * Output: Result<ExtractionResult>
- *
- * 依存: VITE_GEMINI_API_KEY (環境変数)
- * 制約: リトライ最大3回、バックオフ 1s→2s→4s、timeout 30s
  */
 import { ok, fail } from '../types/result.js';
 import { MODELS, THINKING } from './geminiConfig.js';
@@ -24,8 +20,7 @@ import { callGenerateContent } from './geminiClient.js';
 import { getPrompt } from '../prompts/index.js';
 import { analyzeIntent, buildEnrichedMessage } from './intentService.js';
 import { buildSystemContext, serializeDomainForPrompt } from '../types/systemContext.js';
-
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+import { hasApiKey } from './configService.js';
 
 // RL定数（明文化）
 const MAX_RETRIES = 3;
@@ -45,7 +40,7 @@ const REQUEST_TIMEOUT_MS = 30000;
  * @returns {Promise<import('../types/result.js').Result<{chatReply: string, nodes: Array, edges: Array}>>}
  */
 export async function extractRequirements(history, userMessage, nodes = [], edges = [], onStatus = null) {
-  if (!API_KEY) {
+  if (!hasApiKey()) {
     // APIキーなし → モックで即座に成功を返す
     return ok(getMockResponse(userMessage));
   }

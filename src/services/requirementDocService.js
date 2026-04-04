@@ -24,8 +24,7 @@ import { MODELS, THINKING } from './geminiConfig.js';
 import { callGenerateContent } from './geminiClient.js';
 import { getPrompt } from '../prompts/index.js';
 import { serializeDomainForPrompt } from '../types/systemContext.js';
-
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+import { hasApiKey } from './configService.js';
 
 const MAX_RETRIES = 2;
 const INITIAL_RETRY_DELAY_MS = 1000;
@@ -46,7 +45,7 @@ export async function generateRequirementDoc(systemContext) {
     return ok(buildEmptyDoc());
   }
 
-  if (!API_KEY) {
+  if (!hasApiKey()) {
     return ok(buildMockDoc(messages));
   }
 
@@ -180,8 +179,8 @@ ${aiSuggestions || '（提案なし）'}
 - データの永続化方式
 - 外部システム連携の有無
 
-> ⚠️ この要件定義書はAPIキー未設定のためモック出力です。
-> VITE_GEMINI_API_KEY を設定すると、AIが会話を分析して詳細な要件定義書を自動生成します。`;
+> ⚠️ この要件定義書はAPIキーが設定されていないため、モック出力となっています。
+> 右上の「設定」からGemini APIキーを設定すると、AIが詳細な要件定義書を自動的に生成します。`;
 }
 
 function buildEmptyDoc() {

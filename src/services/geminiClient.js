@@ -28,6 +28,8 @@ const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
  * @returns {Promise<{ text: string, thoughtParts: Array }>}
  * @throws {Error} ネットワークエラー / HTTP エラー
  */
+import { getApiKey } from './configService.js';
+
 export async function callGenerateContent({
   modelId,
   contents,
@@ -36,7 +38,7 @@ export async function callGenerateContent({
   generationConfig = {},
   timeoutMs = 30000,
 }) {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = getApiKey();
   const url = `${BASE_URL}/${modelId}:generateContent?key=${apiKey}`;
 
   const controller = new AbortController();
