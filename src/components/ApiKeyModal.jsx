@@ -92,11 +92,12 @@ export default function ApiKeyModal({ onClose, onConfigSaved }) {
         <div className="p-6 space-y-5">
           {/* API Key Input */}
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700">
+            <label htmlFor="gemini-api-key" className="block text-sm font-semibold text-gray-700">
               Gemini API Key
             </label>
             <div className="relative">
               <input
+                id="gemini-api-key"
                 type="password"
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
