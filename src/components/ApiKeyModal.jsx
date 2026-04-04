@@ -12,9 +12,9 @@ export default function ApiKeyModal({ onClose, onConfigSaved }) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden border border-gray-200">
         {/* ヘッダー */}
         <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
-          <h2 className="text-xl font-bold text-gray-800">Gemini API 設定</h2>
+          <h2 className="text-xl font-bold text-gray-800">AI モデル設定</h2>
           <p className="text-xs text-gray-500 mt-1">
-            アプリの動作にはGoogle GeminiのAPIキーが必要です。
+            処理目的に合わせたAIモデルの選択とAPIキーの設定を行います。
           </p>
         </div>
         <ApiKeyPanel onClose={onClose} onConfigSaved={onConfigSaved} embedded={false} />

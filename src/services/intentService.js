@@ -2,21 +2,9 @@
  * intentService
  *
  * 責務: ユーザー入力のインテントを事前分析し、チャットAPIへの精度向上コンテキストを生成する
- *
- * ARC原則:
- * - geminiService の前処理として独立したサービスに分離（SRP）
- * - 失敗時は null を返してフォールバック（チャットAPIは影響を受けない）
- * - 軽量モデル + minimal thinking でコスト・レイテンシを最小化
- *
- * 処理フロー:
- *   ユーザー入力 → analyzeIntent() → IntentResult | null
- *   IntentResult → buildEnrichedMessage() → 付与済みメッセージ文字列
- *
- * Input:  userMessage: string, history: Message[]
- * Output: IntentResult | null（失敗時はnull）
  */
-import { MODELS, THINKING } from './geminiConfig.js';
-import { callGenerateContent } from './geminiClient.js';
+import { PHASES } from './llmConfig.js';
+import { callLLM } from './llmService.js';
 import { getPrompt } from '../prompts/index.js';
 import { hasApiKey } from './configService.js';
 
@@ -26,39 +14,37 @@ const AMBIGUITY_THRESHOLD = 0.7;
 // ---------- public ----------
 
 /**
- * ユーザー入力のインテントを軽量モデルで分析する
+ * ユーザー入力のインテント分析を行う
  *
  * @param {string} userMessage
  * @param {Array<{role: string, content: string}>} history
- * @returns {Promise<IntentResult | null>} 失敗時は null（フォールバック）
- *
- * @typedef {{
- *   operationIntent: 'ADD_FEATURE'|'MODIFY_NODE'|'DELETE_NODE'|'CHANGE_FLOW'|'CLARIFY'|'CONFIRM',
- *   domain: 'EC'|'SOCIAL'|'B2B_TOOL'|'IOT'|'HEALTHCARE'|'GENERAL',
- *   ambiguityScore: number,
- *   summary: string,
- *   keyEntities: string[]
- * }} IntentResult
+ * @returns {Promise<import('./llmConfig.js').IntentResult | null>} 失敗時は null（フォールバック）
  */
 export async function analyzeIntent(userMessage, history) {
-  if (!hasApiKey()) return null;
+  // いずれかのキーがあれば試行する (llmService側で詳細チェック)
+  if (!hasApiKey('google') && !hasApiKey('openai') && !hasApiKey('anthropic')) return null;
 
   try {
     const systemPrompt = getPrompt('intent');
-    const contents = buildIntentContents(history, userMessage);
+    
+    // 直近5ターンのみ使用（インテント判定には最小限の文脈で十分）
+    const recentHistory = history.slice(-5);
 
-    const { text } = await callGenerateContent({
-      modelId: MODELS.intent,
-      thinkingLevel: THINKING.intent,
-      contents,
+    const result = await callLLM({
+      phaseId: PHASES.INTENT.id,
+      history: recentHistory,
+      userMessage,
       systemPrompt,
-      generationConfig: { responseMimeType: 'application/json' },
-      timeoutMs: 10000,
+      options: { 
+        responseFormat: { type: 'json_object' }
+      }
     });
 
-    return parseIntentResponse(text);
-  } catch {
-    // インテント分析の失敗はチャット本体に影響させない
+    if (!result.ok) throw new Error(result.message);
+
+    return parseIntentResponse(result.value);
+  } catch (e) {
+    console.error('[intentService] Intent analysis failed:', e);
     return null;
   }
 }
@@ -67,7 +53,7 @@ export async function analyzeIntent(userMessage, history) {
  * インテント分析結果をユーザーメッセージの前置きとして付与する
  *
  * @param {string} userMessage 元のユーザーメッセージ
- * @param {IntentResult} intent analyzeIntent() の戻り値
+ * @param {import('./llmConfig.js').IntentResult} intent analyzeIntent() の戻り値
  * @returns {string} インテントコンテキストを付与したメッセージ
  */
 export function buildEnrichedMessage(userMessage, intent) {
@@ -93,46 +79,25 @@ export function buildEnrichedMessage(userMessage, intent) {
 // ---------- private ----------
 
 /**
- * インテント分析用のcontents配列を構築する
- * 直近の会話履歴（最大5ターン）をコンテキストとして付与する
- */
-function buildIntentContents(history, userMessage) {
-  // 直近5ターンのみ使用（インテント判定には最小限の文脈で十分）
-  const recentHistory = history.slice(-5);
-
-  return [
-    ...recentHistory.map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    })),
-    { role: 'user', parts: [{ text: userMessage }] },
-  ];
-}
-
-/**
  * インテント分析APIのレスポンスをパースする
- * @param {string} text
- * @returns {IntentResult}
- * @throws {Error} パース失敗時
  */
 function parseIntentResponse(text) {
   // 1st try: そのままJSONパース
   try {
     return validateIntent(JSON.parse(text));
-  } catch (_) { /* fall through */ }
+  } catch { /* fall through */ }
 
   // 2nd try: Markdownコードブロック除去
-  const stripped = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+  const stripped = text.replace(/```json\s*/gi, '').replace(/```\s*$/, '').trim();
   try {
     return validateIntent(JSON.parse(stripped));
-  } catch (_) { /* fall through */ }
+  } catch { /* fall through */ }
 
   throw new Error(`INTENT_PARSE_ERROR: ${text.slice(0, 100)}`);
 }
 
 /**
- * パース済みオブジェクトを安全なIntentResultに変換する
- * 不正な値はデフォルト値にフォールバックする
+ * パース済みオブジェクトを安全な形式に変換する
  */
 function validateIntent(parsed) {
   const VALID_INTENTS = ['ADD_FEATURE', 'MODIFY_NODE', 'DELETE_NODE', 'CHANGE_FLOW', 'CLARIFY', 'CONFIRM'];

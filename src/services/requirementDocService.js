@@ -2,33 +2,16 @@
  * requirementDocService
  *
  * 責務: SystemContextから詳細要件定義書（Markdown）を生成する
- *
- * ARC原則:
- * - 副作用（Gemini API通信）を閉じ込め、Result型で返却
- * - geminiService と同じ retry + timeout パターンを踏襲
- * - APIキー未設定時はモック（会話履歴の構造化変換）にフォールバック
- *
- * フェーズ1改修:
- * - 引数を messages のみ → SystemContext に変更
- * - buildContents が nodes/edges のグラフ情報をプロンプトに含めるよう拡張
- *   → 設計図で手動修正したノード情報が要件定義書に反映される
- *
- * フェーズ3改修:
- * - SYSTEM_PROMPT 定数を削除し、getPrompt('requirementDoc', { graphSnapshot }) 経由で取得
- *
- * Input:  SystemContext
- * Output: Result<string>  (Markdown形式の要件定義書)
  */
-import { ok, fail } from '../types/result.js';
-import { MODELS, THINKING } from './geminiConfig.js';
-import { callGenerateContent } from './geminiClient.js';
+import { ok } from '../types/result.js';
+import { PHASES } from './llmConfig.js';
+import { callLLM } from './llmService.js';
 import { getPrompt } from '../prompts/index.js';
 import { serializeDomainForPrompt } from '../types/systemContext.js';
 import { hasApiKey } from './configService.js';
 
 const MAX_RETRIES = 2;
 const INITIAL_RETRY_DELAY_MS = 1000;
-const REQUEST_TIMEOUT_MS = 45000; // 長文生成のため少し長め
 
 // ---------- public ----------
 
@@ -45,11 +28,11 @@ export async function generateRequirementDoc(systemContext) {
     return ok(buildEmptyDoc());
   }
 
-  if (!hasApiKey()) {
+  if (!hasApiKey('google') && !hasApiKey('openai') && !hasApiKey('anthropic')) {
     return ok(buildMockDoc(messages));
   }
 
-  const contents = buildContents(systemContext);
+  const userMessage = buildExtractionPrompt(systemContext);
 
   let retries = MAX_RETRIES;
   let delay = INITIAL_RETRY_DELAY_MS;
@@ -57,8 +40,19 @@ export async function generateRequirementDoc(systemContext) {
 
   while (retries > 0) {
     try {
-      const result = await callApi(contents, systemContext);
-      return ok(result);
+      const graphSnapshot = serializeDomainForPrompt(systemContext);
+      const systemPrompt = getPrompt('requirementDoc', { graphSnapshot });
+
+      const result = await callLLM({
+        phaseId: PHASES.DOC.id,
+        userMessage,
+        systemPrompt,
+        options: { maxTokens: 4096 }
+      });
+
+      if (!result.ok) throw new Error(result.message);
+
+      return ok(cleanMarkdown(result.value));
     } catch (e) {
       lastError = e;
       retries--;
@@ -76,25 +70,15 @@ export async function generateRequirementDoc(systemContext) {
 
 // ---------- private ----------
 
-async function callApi(contents, systemContext) {
-  // フェーズ3: PromptRegistry + グラフスナップショットを注入してプロンプトを組み立てる
-  const graphSnapshot = serializeDomainForPrompt(systemContext);
-  const systemPrompt = getPrompt('requirementDoc', { graphSnapshot });
+function buildExtractionPrompt(systemContext) {
+  const { messages } = systemContext;
 
-  const { text } = await callGenerateContent({
-    modelId: MODELS.doc,
-    thinkingLevel: THINKING.doc,
-    contents,
-    systemPrompt,
-    generationConfig: { maxOutputTokens: 4096 },
-    timeoutMs: REQUEST_TIMEOUT_MS,
-  });
+  // 会話履歴を1つのテキストにまとめて送る
+  const conversationText = messages
+    .map(m => `[${m.role === 'user' ? 'ユーザー' : 'アシスタント'}]: ${m.content}`)
+    .join('\n\n');
 
-  if (!text.trim()) {
-    throw new Error('Empty response from API');
-  }
-
-  return cleanMarkdown(text);
+  return `以下の会話履歴を分析し、詳細要件定義書を生成してください。\n\n---\n${conversationText}\n---`;
 }
 
 /**
@@ -105,30 +89,6 @@ function cleanMarkdown(text) {
     .replace(/^```markdown\s*/i, '')
     .replace(/```\s*$/, '')
     .trim();
-}
-
-/**
- * フェーズ1改修: SystemContext 全体を使ってプロンプト用コンテンツを組み立てる
- * - 会話履歴に加え、グラフのノード/エッジ情報も含める
- *
- * @param {import('../types/systemContext.js').SystemContext} systemContext
- */
-function buildContents(systemContext) {
-  const { messages } = systemContext;
-
-  // 会話履歴を1つのテキストにまとめて送る
-  const conversationText = messages
-    .map(m => `[${m.role === 'user' ? 'ユーザー' : 'アシスタント'}]: ${m.content}`)
-    .join('\n\n');
-
-  return [
-    {
-      role: 'user',
-      parts: [{
-        text: `以下の会話履歴を分析し、詳細要件定義書を生成してください。\n\n---\n${conversationText}\n---`
-      }]
-    }
-  ];
 }
 
 /**
@@ -187,7 +147,7 @@ function buildEmptyDoc() {
   return `# アプリ要件定義書
 
 > まだ会話が開始されていません。
-> 左のチャットで要件を話し合った後、再度エクスポートしてください。`;
+> 左のチャットで要件を話し合ってノードが生成されたあと、再度エクスポートしてください。`;
 }
 
 function sleep(ms) {
