@@ -136,10 +136,17 @@ function CanvasPane({
   onUpdateEdgeData, onRemoveEdge, onNodeDragStop, onShowExport,
   requirementDoc, isUpdatingDoc, onUpdateRequirement,
   consistencyResult, reviewReport, isGeneratingReview,
-  onGenerateReview, onPushToChat,
+  onGenerateReview, onPushToChat, onSidePanelChange,
   isMobile = false
 }) {
   const [rightPanel, setRightPanel] = useState('none'); // 'none', 'wireframe', 'requirement', 'review', 'diagram'
+
+  // 右パネルの開閉状態を親（App.jsx）に通知して制御
+  useEffect(() => {
+    if (onSidePanelChange) {
+      onSidePanelChange(rightPanel !== 'none');
+    }
+  }, [rightPanel, onSidePanelChange]);
   const [activeEdgeType, setActiveEdgeType] = useState('screen_transition');
   const [diagramSubTab, setDiagramSubTab] = useState('flow'); // 'flow', 'er'
   const [showLegend, setShowLegend] = useState(false);

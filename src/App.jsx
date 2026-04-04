@@ -63,6 +63,8 @@ export default function App() {
     enabled: isMobile,
   });
 
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
+
   // SSOT: ノード/エッジの全操作はこのストア経由
   const store = useCanvasStore(initial.nodes, initial.edges, initial.messages);
 
@@ -92,7 +94,7 @@ export default function App() {
     if (chat.messages.length > 1) {
       store.persist(chat.messages);
     }
-  }, [chat.messages, store.persist]);
+  }, [chat.messages, store]);
 
   const handleReset = useCallback(() => {
     if (!window.confirm('会話とキャンバスをリセットしますか？')) return;
@@ -141,6 +143,7 @@ export default function App() {
     isGeneratingReview: agent.isGeneratingReview,
     onGenerateReview: agent.requestReview,
     onPushToChat: handlePushToChat,
+    onSidePanelChange: (isOpen) => setIsSidePanelOpen(isOpen),
   };
 
   const chatPaneProps = {
@@ -169,16 +172,18 @@ export default function App() {
           </div>
         </div>
 
-        <BurgerMenu
-          onResetConfirmed={handleResetConfirmed}
-          nodes={store.nodes}
-          edges={store.edges}
-          requirementDoc={agent.requirementDoc}
-          isUpdatingDoc={agent.isUpdatingDoc}
-          onUpdateRequirement={agent.requestRequirementUpdate}
-          techConstraints={agent.techConstraints}
-          onUpdateTechConstraints={agent.setTechConstraints}
-        />
+        {!isSidePanelOpen && (
+          <BurgerMenu
+            onResetConfirmed={handleResetConfirmed}
+            nodes={store.nodes}
+            edges={store.edges}
+            requirementDoc={agent.requirementDoc}
+            isUpdatingDoc={agent.isUpdatingDoc}
+            onUpdateRequirement={agent.requestRequirementUpdate}
+            techConstraints={agent.techConstraints}
+            onUpdateTechConstraints={agent.setTechConstraints}
+          />
+        )}
 
         <MobileNav activePanel={activePanel} onSelectPanel={setActivePanel} />
       </div>
