@@ -13,12 +13,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.66",
+    "@ai-sdk/google": "^3.0.58",
+    "@ai-sdk/mistral": "^3.0.28",
+    "@ai-sdk/openai": "^3.0.50",
     "@dagrejs/dagre": "^3.0.0",
+    "ai": "^6.0.146",
     "marked": "^17.0.5",
     "mermaid": "^11.14.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "reactflow": "^11.11.4"
+    "reactflow": "^11.11.4",
+    "zod": "^4.3.6"
   },
   "optionalDependencies": {
     "@rolldown/binding-win32-x64-msvc": "^1.0.0-rc.12"

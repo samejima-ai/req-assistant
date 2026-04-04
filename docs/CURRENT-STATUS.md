@@ -1,6 +1,6 @@
 # CURRENT STATUS — req-assistant
 
-最終更新: 2026-04-04（モバイルUI最適化 Phase 2・凡例メニュー統合・FAB刷新・FAB自動非表示機能追加）
+最終更新: 2026-04-04（マルチモデル対応・Vercel AI SDK統合・Gemini 3.1 Preview対応・設定パネル刷新）
 
 ---
 
@@ -23,7 +23,7 @@
 | 図表生成       | Mermaid     | 11.14.0                               |
 | レイアウト計算 | Dagre       | 3.0.0                                 |
 | Markdown変換   | Marked      | 17.0.5                                |
-| AI             | Gemini API  | (gemini-2.5-flash / gemini-2.0-flash) |
+| AI             | Multi-LLM   | Vercel AI SDK (Gemini 3.1 / GPT-5.4 / Claude 4.6) |
 
 ---
 
@@ -68,6 +68,9 @@
 - **ペイン幅調整** — 左右ペイン比率を手動調整・保存
 - **カスタムプロンプト対応** — PromptRegistry でlocalStorageから動的切替
 - **Gemini APIキー設定UI** — 初回アクセス時のキー入力モーダル、疎通確認（テスト実行）、永続化（localStorage/sessionStorage）の選択に対応。Vercelデプロイ時のアクセシビリティを向上。
+- **マルチモデル・ハイブリッド給電** — **Vercel AI SDK** を統合し、Google, OpenAI, Anthropic の各モデルを横断的に利用可能。
+- **フェーズ別モデル選択** — インテント分析(Fast)、設計図生成(Thinking)、要件書作成(Standard)、レビュー(Standard)の各工程で最適なモデルを個別に設定可能。
+- **設定パネル (ApiKeyPanel)** — モデルティア選択（高速・標準・思考）とプロバイダーごとのAPIキー管理・疎通確認をタブ形式で統合。
 
 ### モバイル最適化（Phase 2）
 
@@ -96,14 +99,13 @@ src/
 │   ├── usePaneResize.js         # ペイン幅管理
 │   └── useProjectStorage.js    # localStorage永続化
 ├── services/       # API通信・計算
+│   ├── llmService.js            # 統一LLMインターフェース (Vercel AI SDK)
+│   ├── llmConfig.js             # モデルレジストリ (Gemini 3.1/GPT-5.4/Claude 4.6)
 │   ├── configService.js         # APIキー管理（Local/Session/Env）
-│   ├── geminiService.js         # チャット + グラフ抽出（グラフ状態Context注入・onStatus対応）
-│   ├── intentService.js         # インテント分析・メッセージ付与
-│   ├── requirementDocService.js # 要件定義書生成
-│   ├── reviewService.js         # レビュー生成
-│   ├── complexityAssessor.js    # A+Bハイブリッド複雑性判定
-│   ├── geminiClient.js          # 共通HTTPクライアント
-│   └── geminiConfig.js          # モデル設定一元管理
+│   ├── geminiService.js         # 設計図抽出 (llmService経由)
+│   ├── intentService.js         # インテント分析 (llmService経由)
+│   ├── requirementDocService.js # 要件定義書生成 (llmService経由)
+│   ├── reviewService.js         # レビュー生成 (llmService経由)
 ├── utils/          # 純粋計算（副作用なし）
 │   ├── layoutUtils.js           # dagre レイアウト計算
 │   ├── wireframeGenerator.js    # ワイヤーフレームHTML生成
@@ -144,11 +146,9 @@ src/
 `.env.local` に設定（`.env.example` 参照）:
 
 ```text
-VITE_GEMINI_API_KEY=         # Gemini API キー（必須。UIからも設定可能）
-VITE_GEMINI_MODEL_INTENT=    # インテント分析モデル（省略可、default: gemini-2.0-flash-lite）
-VITE_GEMINI_MODEL_CHAT=      # チャットモデル（省略可）
-VITE_GEMINI_MODEL_DOC=       # 要件書生成モデル（省略可）
-VITE_GEMINI_MODEL_REVIEW=    # レビューモデル（省略可）
+VITE_GOOGLE_API_KEY=         # Google Gemini API キー (VITE_GEMINI_API_KEYも互換性の為維持)
+VITE_OPENAI_API_KEY=         # OpenAI API キー
+VITE_ANTHROPIC_API_KEY=      # Anthropic API キー
 ```
 
 APIキー未設定でもUIの「設定」から入力することでアプリ動作可能（localStorage/sessionStorageに保持）。
