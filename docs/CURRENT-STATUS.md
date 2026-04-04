@@ -1,6 +1,6 @@
 # CURRENT STATUS — req-assistant
 
-最終更新: 2026-04-02（グラフ状態Context強化・処理ステータス表示・MP出力改善）
+最終更新: 2026-04-04（APIキー設定UI・Vercelデプロイ対応・configService追加）
 
 ---
 
@@ -67,6 +67,7 @@
 - **プロジェクト永続化** — localStorage に自動保存・リロード後復元
 - **ペイン幅調整** — 左右ペイン比率を手動調整・保存
 - **カスタムプロンプト対応** — PromptRegistry でlocalStorageから動的切替
+- **Gemini APIキー設定UI** — 初回アクセス時のキー入力モーダル、疎通確認（テスト実行）、永続化（localStorage/sessionStorage）の選択に対応。Vercelデプロイ時のアクセシビリティを向上。
 
 ---
 
@@ -87,6 +88,7 @@ src/
 │   ├── usePaneResize.js         # ペイン幅管理
 │   └── useProjectStorage.js    # localStorage永続化
 ├── services/       # API通信・計算
+│   ├── configService.js         # APIキー管理（Local/Session/Env）
 │   ├── geminiService.js         # チャット + グラフ抽出（グラフ状態Context注入・onStatus対応）
 │   ├── intentService.js         # インテント分析・メッセージ付与
 │   ├── requirementDocService.js # 要件定義書生成
@@ -110,9 +112,10 @@ src/
 │   ├── requirementDoc.prompt.js
 │   └── review.prompt.js
 └── components/     # UIコンポーネント
-    ├── ChatPane.jsx             # thinkingStatus表示対応
+    ├── ChatPane.jsx             # 設定ボタン追加
     ├── CanvasPane.jsx
     ├── ExportModal.jsx          # MP出力にノード・エッジ一覧追加
+    ├── ApiKeyModal.jsx          # APIキー設定・疎通確認
     ├── nodes/      # ActorNode / UIComponentNode / DataEntityNode / ActionNode
     └── edges/      # TransitionEdge / DataFlowEdge / ActionEdge
 ```
@@ -133,14 +136,14 @@ src/
 `.env.local` に設定（`.env.example` 参照）:
 
 ```
-VITE_GEMINI_API_KEY=         # Gemini API キー（必須）
+VITE_GEMINI_API_KEY=         # Gemini API キー（必須。UIからも設定可能）
 VITE_GEMINI_MODEL_INTENT=    # インテント分析モデル（省略可、default: gemini-2.0-flash-lite）
 VITE_GEMINI_MODEL_CHAT=      # チャットモデル（省略可）
 VITE_GEMINI_MODEL_DOC=       # 要件書生成モデル（省略可）
 VITE_GEMINI_MODEL_REVIEW=    # レビューモデル（省略可）
 ```
 
-APIキー未設定でもモック出力でアプリ動作可能。
+APIキー未設定でもUIの「設定」から入力することでアプリ動作可能（localStorage/sessionStorageに保持）。
 
 ---
 
@@ -174,6 +177,8 @@ Node.js 20.19+ または 22.12+ が必要（22.11.0 は非対応）。
 | `current` | feat: グラフ状態Context注入 — 現在のノード/エッジ構造をGeminiに渡し一貫性を向上   |
 | `current` | feat: 処理ステータス表示 — チャット待機中に処理フェーズテキストを表示             |
 | `current` | feat: MP出力にノード・エッジ一覧（ラベル・説明・型）を追加                        |
+| `current` | feat: Gemini APIキー設定UI (ApiKeyModal) & configService 実装                     |
+| `current` | feat: Vercelデプロイ対応 — ブラウザ側でのAPIキー設定・永続化をサポート            |
 
 ---
 

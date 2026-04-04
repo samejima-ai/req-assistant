@@ -29,6 +29,8 @@ import CanvasPane from './components/CanvasPane.jsx';
 import ExportModal from './components/ExportModal.jsx';
 import { usePaneResize } from './hooks/usePaneResize.js';
 import { useConsistencyCheck } from './hooks/useConsistencyCheck.js';
+import ApiKeyModal from './components/ApiKeyModal.jsx';
+import { hasApiKey } from './services/configService.js';
 
 function loadInitialState() {
   const saved = loadSavedProject();
@@ -44,6 +46,7 @@ export default function App() {
   const [initial] = useState(() => loadInitialState());
 
   const [showExport, setShowExport] = useState(false);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(() => !hasApiKey());
   const { chatWidthPercent, handleMouseDown } = usePaneResize();
 
   // SSOT: ノード/エッジの全操作はこのストア経由
@@ -105,6 +108,7 @@ export default function App() {
           onSendMessage={chat.sendMessage}
           onClearError={chat.clearError}
           onReset={handleReset}
+          onOpenSettings={() => setShowApiKeyModal(true)}
           inputText={chat.inputText}
           onInputChange={chat.setInputText}
         />
@@ -149,6 +153,11 @@ export default function App() {
           techConstraints={agent.techConstraints}
           onUpdateTechConstraints={agent.setTechConstraints}
           onClose={() => setShowExport(false)}
+        />
+      )}
+      {showApiKeyModal && (
+        <ApiKeyModal 
+          onClose={() => setShowApiKeyModal(false)} 
         />
       )}
     </div>

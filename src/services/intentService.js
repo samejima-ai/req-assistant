@@ -18,8 +18,7 @@
 import { MODELS, THINKING } from './geminiConfig.js';
 import { callGenerateContent } from './geminiClient.js';
 import { getPrompt } from '../prompts/index.js';
-
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+import { hasApiKey } from './configService.js';
 
 // 曖昧度がこの値以上の場合、ノード生成より逆質問を優先するよう指示する
 const AMBIGUITY_THRESHOLD = 0.7;
@@ -42,7 +41,7 @@ const AMBIGUITY_THRESHOLD = 0.7;
  * }} IntentResult
  */
 export async function analyzeIntent(userMessage, history) {
-  if (!API_KEY) return null;
+  if (!hasApiKey()) return null;
 
   try {
     const systemPrompt = getPrompt('intent');
