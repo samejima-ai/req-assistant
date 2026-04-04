@@ -72,7 +72,7 @@
 ### モバイル最適化（Phase 2）
 
 - **サイバー風グラデーションFAB** — メニューボタンを **右上** (`top-4 right-4`) に配置された円形グラデーションFAB（Floating Action Button）に刷新。設定・エクスポート機能をスマートに集約。
-- **独立した凡例・エッジ選択ボタン** — 凡例・接続種別選択メニューを、キャンバス **右下** の独立したボタンに配置。ポップオーバー形式で開閉可能にし、キャンバス作業領域を大幅に拡張。
+- **独立した凡例・エッジ選択ボタン** — 凡例・接続種別選択メニューを、キャンバス **右下** の独立したボタンに配置。ナビゲーションバーとの重なりを避け、ポップオーバー形式で開閉可能に。
 - **レスポンシブ・ツールバー** — モバイル時にはツールバーボタンをアイコンのみの円形ボタンに自動変換。画面上部でFABと重ならないよう位置を自動調整。
 - **サイドパネル全画面対応** — モバイル時に右パネル（要件定義・レビューなど）を全画面表示にするよう最適化。
 
@@ -189,7 +189,9 @@ Node.js 20.19+ または 22.12+ が必要（22.11.0 は非対応）。
 | `f23822a` | fix: resolve whiteout and flickering when copying MP in ExportModal               |
 | `8089bc7` | fix: move FAB to left and legend to right on mobile to avoid send button overlap  |
 | `f36b104` | feat: integrate canvas legend into collapsible toolbar menu                       |
-| `current` | docs: update README and CURRENT-STATUS for Mobile UI Optimization Phase 2         |
+| `52c82f6` | feat: finalize FAB position to top-right and Legend to bottom-right               |
+| `0731c78` | fix: adjust Legend button bottom position on mobile to avoid nav overlap          |
+| `current` | docs: update README and CURRENT-STATUS (Phase 2 OK)                               |
 
 ---
 
